@@ -104,61 +104,71 @@ function Profile() {
   }, [navigate]);
 
   // FETCH LOGGED-IN CUSTOMER ORDERS
-useEffect(() => {
-  if (!user) return;
+  
+  useEffect(() => {
+    if (!user) {
+      setOrdersLoading(false);
+      return;
+    }
 
-  const controller = new AbortController();
+    const controller = new AbortController();
 
-  async function fetchMyOrders() {
-    try {
+    async function fetchMyOrders() {
       setOrdersLoading(true);
       setOrdersError("");
 
-      const token = localStorage.getItem("token");
+      try {
+        const token = localStorage.getItem("token");
 
-      if (!token) {
-        throw new Error("Please sign in to view your orders.");
-      }
-
-      const response = await fetch(
-        `${API_URL}/api/orders/my`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          signal: controller.signal,
+        if (!token) {
+          throw new Error("Please sign in to view your orders.");
         }
-      );
 
-      const data = await response.json();
+        console.log("Fetching customer orders...");
 
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Unable to fetch your orders."
+        const response = await fetch(
+          `${API_URL}/api/orders/my`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            signal: controller.signal,
+          }
         );
-      }
 
-      if (!controller.signal.aborted) {
-        setOrders(
-          Array.isArray(data.orders) ? data.orders : []
-        );
-      }
-    } catch (error) {
-      if (error.name !== "AbortError") {
-        setOrdersError(error.message);
-      }
-    } finally {
-      if (!controller.signal.aborted) {
-        setOrdersLoading(false);
+        console.log("Orders API status:", response.status);
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message || "Unable to fetch your orders."
+          );
+        }
+
+        if (!controller.signal.aborted) {
+          setOrders(
+            Array.isArray(data.orders) ? data.orders : []
+          );
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error("Orders fetch error:", error);
+          setOrdersError(error.message);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setOrdersLoading(false);
+        }
       }
     }
-  }
 
-  fetchMyOrders();
+    fetchMyOrders();
 
-  return () => controller.abort();
-}, [user?._id]);
+    return () => controller.abort();
+  }, [user]);
+
 
   // LOGOUT
   function handleLogout() {
