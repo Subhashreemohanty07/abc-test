@@ -100,7 +100,7 @@ function OrderSuccess() {
                 }}
               ></i>
 
-              <h2 className="fw-bold mt-3">
+              <h2 className="fw-bold mt-3" style={{ color: "#f3338f" }}>
                 Order Placed Successfully!
               </h2>
 

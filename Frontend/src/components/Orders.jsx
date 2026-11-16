@@ -8,33 +8,35 @@ function Orders({
   isVendor = false,
   customers = [],
   orders = [],
+  selectedCustomerId = "",
 }) {
   const [search, setSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState("");
-
-  // EXPAND / COLLAPSE ORDER DETAILS
   const [expandedOrderId, setExpandedOrderId] = useState(null);
+  const [downloadingOrderId, setDownloadingOrderId] = useState(null);
+  const [downloadError, setDownloadError] = useState("");
 
+  // EXPAND / COLLAPSE DETAILS
   const toggleOrderDetails = (orderId) => {
     setExpandedOrderId((previousId) =>
       previousId === orderId ? null : orderId
     );
   };
 
-  // PDF DOWNLOAD STATES
-  const [downloadingOrderId, setDownloadingOrderId] = useState(null);
-  const [downloadError, setDownloadError] = useState("");
-
+  // CUSTOMER SEARCH (FOR STANDALONE ADMIN ORDERS)
   const filteredCustomers = customers.filter((customer) =>
     `${customer.name || ""} ${customer.email || ""}`
       .toLowerCase()
       .includes(search.toLowerCase())
   );
 
+  const activeCustomerId = selectedCustomerId || selectedCustomer;
+
   const customer = customers.find(
-    (item) => item._id === selectedCustomer
+    (item) => item._id === activeCustomerId
   );
 
+  // ADMIN FILTERS ORDERS BY SELECTED CUSTOMER
   const visibleOrders = isAdmin
     ? orders.filter((order) => {
         const customerId =
@@ -42,13 +44,13 @@ function Orders({
             ? order.user?._id
             : order.user;
 
-        return customerId === selectedCustomer;
+        return customerId === activeCustomerId;
       })
     : orders;
 
-  // DOWNLOAD CUSTOMER PDF RECEIPT
+  // CUSTOMER-ONLY PDF RECEIPT
   async function handleDownloadReceipt(orderId) {
-    if (downloadingOrderId !== null) return;
+    if (isAdmin || isVendor || downloadingOrderId !== null) return;
 
     const token = localStorage.getItem("token");
 
@@ -95,7 +97,6 @@ function Orders({
       }, 1000);
     } catch (error) {
       console.error("Receipt download error:", error);
-
       setDownloadError(
         error.message || "Unable to download receipt."
       );
@@ -125,15 +126,15 @@ function Orders({
 
           <p className="text-secondary small mb-0">
             {isAdmin
-              ? "Select a customer to view their purchase history."
+              ? "View the selected customer's purchase history."
               : isVendor
               ? "View customers who purchased products from your store."
               : "View and track your purchase orders."}
           </p>
         </div>
 
-        {/* ADMIN CUSTOMER SELECTION */}
-        {isAdmin && (
+        {/* OPTIONAL ADMIN CUSTOMER SEARCH */}
+        {isAdmin && !selectedCustomerId && (
           <div className="row g-3 mb-4">
             <div className="col-12 col-md-6">
               <label className="form-label fw-semibold">
@@ -173,8 +174,8 @@ function Orders({
           </div>
         )}
 
-        {/* ADMIN SELECTED CUSTOMER */}
-        {isAdmin && customer && (
+        {/* OPTIONAL SELECTED CUSTOMER DETAILS */}
+        {isAdmin && !selectedCustomerId && customer && (
           <div className="bg-light rounded-3 p-3 mb-4">
             <h6 className="fw-bold mb-1">
               {customer.name}
@@ -186,15 +187,15 @@ function Orders({
           </div>
         )}
 
-        {/* PDF DOWNLOAD ERROR */}
-        {downloadError && (
+        {/* PDF ERROR - CUSTOMER ONLY */}
+        {!isAdmin && !isVendor && downloadError && (
           <div className="alert alert-danger" role="alert">
             {downloadError}
           </div>
         )}
 
         {/* ORDER CONTENT */}
-        {isAdmin && !selectedCustomer ? (
+        {isAdmin && !activeCustomerId ? (
           <div className="text-center border rounded-3 py-5 px-3">
             <i className="bi bi-person-check fs-1 text-secondary"></i>
 
@@ -224,13 +225,11 @@ function Orders({
           </div>
         ) : (
           <div className="d-flex flex-column gap-3">
-
             {visibleOrders.map((order) => (
               <div
                 key={order._id}
                 className="border rounded-3 p-3"
               >
-
                 {/* ORDER NUMBER AND STATUS */}
                 <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                   <h6 className="fw-bold mb-0">
@@ -238,7 +237,9 @@ function Orders({
                   </h6>
 
                   <span className="badge bg-light text-dark border">
-                    {order.orderStatus || order.status || "Pending"}
+                    {order.orderStatus ||
+                      order.status ||
+                      "Pending"}
                   </span>
                 </div>
 
@@ -249,7 +250,7 @@ function Orders({
                     : "Date unavailable"}
                 </p>
 
-                {/* TOTAL AND BUTTONS */}
+                {/* TOTAL AND ACTION BUTTONS */}
                 <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
                   <span className="fw-semibold">
                     Total: ₹
@@ -262,8 +263,8 @@ function Orders({
 
                   <div className="d-flex flex-wrap gap-2">
 
-                    {/* VENDOR VIEW / HIDE DETAILS */}
-                    {isVendor && (
+                    {/* ADMIN AND VENDOR VIEW DETAILS */}
+                    {(isAdmin || isVendor) && (
                       <button
                         type="button"
                         className="btn btn-sm btn-outline-secondary"
@@ -288,7 +289,7 @@ function Orders({
                       </button>
                     )}
 
-                    {/* CUSTOMER PDF DOWNLOAD */}
+                    {/* CUSTOMER PDF DOWNLOAD ONLY */}
                     {!isAdmin && !isVendor && (
                       <button
                         type="button"
@@ -314,133 +315,160 @@ function Orders({
                   </div>
                 </div>
 
-                {/* PAYMENT DETAILS */}
-                {!isAdmin && (
-                  <p className="small text-secondary mt-2 mb-0">
-                    Payment: {order.paymentMethod || "N/A"}
-                    {" | "}
-                    {order.paymentStatus || "Pending"}
-                  </p>
-                )}
+                {/* PAYMENT INFORMATION */}
+                <p className="small text-secondary mt-2 mb-0">
+                  Payment: {order.paymentMethod || "N/A"}
+                  {" | "}
+                  {order.paymentStatus || "Pending"}
+                </p>
 
-                {/* EXPANDABLE VENDOR ORDER DETAILS */}
-                {isVendor && expandedOrderId === order._id && (
-                  <div className="mt-3 border-top pt-3">
+                {/* EXPANDABLE ORDER DETAILS */}
+                {(isAdmin || isVendor) &&
+                  expandedOrderId === order._id && (
+                    <div className="mt-3 border-top pt-3">
 
-                    {/* CUSTOMER DETAILS */}
-                    <h6 className="fw-bold">
-                      Customer Details
-                    </h6>
+                      {/* CUSTOMER DETAILS */}
+                      <h6 className="fw-bold">
+                        Customer Details
+                      </h6>
 
-                    <p className="small mb-1">
-                      <strong>Name:</strong>{" "}
-                      {order.customer?.name ||
-                        order.deliveryAddress?.fullName ||
-                        "N/A"}
-                    </p>
+                      <p className="small mb-1">
+                        <strong>Name:</strong>{" "}
+                        {order.customer?.name ||
+                          order.user?.name ||
+                          order.deliveryAddress?.fullName ||
+                          "N/A"}
+                      </p>
 
-                    <p className="small mb-3">
-                      <strong>Email:</strong>{" "}
-                      {order.customer?.email || "N/A"}
-                    </p>
+                      <p className="small mb-3">
+                        <strong>Email:</strong>{" "}
+                        {order.customer?.email ||
+                          order.user?.email ||
+                          "N/A"}
+                      </p>
 
-                    {/* PURCHASED PRODUCTS */}
-                    <h6 className="fw-bold">
-                      Purchased Products
-                    </h6>
+                      {/* PURCHASED PRODUCTS */}
+                      <h6 className="fw-bold">
+                        Purchased Products
+                      </h6>
 
-                    {order.items?.map((item) => (
-                      <div
-                        key={item._id}
-                        className="d-flex gap-3 border rounded-3 p-2 mb-2"
-                      >
-                        {item.image && (
-                          <img
-                            src={item.image}
-                            alt={item.productName}
-                            style={{
-                              width: "65px",
-                              height: "65px",
-                              objectFit: "cover",
-                              borderRadius: "8px",
-                            }}
-                          />
-                        )}
+                      {order.items?.length > 0 ? (
+                        order.items.map((item, index) => (
+                          <div
+                            key={item._id || index}
+                            className="d-flex gap-3 border rounded-3 p-2 mb-2"
+                          >
+                            {item.image ? (
+                              <img
+                                src={item.image}
+                                alt={item.productName || "Product"}
+                                style={{
+                                  width: "65px",
+                                  height: "65px",
+                                  objectFit: "cover",
+                                  borderRadius: "8px",
+                                }}
+                              />
+                            ) : (
+                              <div
+                                className="bg-light rounded d-flex align-items-center justify-content-center flex-shrink-0"
+                                style={{
+                                  width: "65px",
+                                  height: "65px",
+                                }}
+                              >
+                                <i className="bi bi-image text-secondary"></i>
+                              </div>
+                            )}
 
-                        <div>
-                          <p className="fw-semibold small mb-1">
-                            {item.productName}
-                          </p>
+                            <div className="flex-grow-1">
+                              <p className="fw-semibold small mb-1">
+                                {item.productName || "Product"}
+                              </p>
 
-                          <p className="small text-secondary mb-1">
-                            Brand: {item.brand}
-                          </p>
+                              {item.brand && (
+                                <p className="small text-secondary mb-1">
+                                  Brand: {item.brand}
+                                </p>
+                              )}
 
-                          <p className="small mb-1">
-                            Quantity: {item.quantity}
-                          </p>
+                              {/* VENDOR INFORMATION FOR ADMIN */}
+                              {isAdmin && (
+                                <p className="small mb-1">
+                                  <strong>Vendor:</strong>{" "}
+                                  {item.vendor?.storeName ||
+                                    item.vendor?.name ||
+                                    "N/A"}
+                                </p>
+                              )}
 
-                          {item.size && (
-                            <p className="small mb-1">
-                              Size: {item.size}
-                            </p>
-                          )}
+                              <p className="small mb-1">
+                                Quantity: {item.quantity}
+                              </p>
 
-                          {item.color && (
-                            <p className="small mb-1">
-                              Color: {item.color}
-                            </p>
-                          )}
+                              {item.size && (
+                                <p className="small mb-1">
+                                  Size: {item.size}
+                                </p>
+                              )}
 
-                          <p className="small mb-0">
-                            Price: ₹
-                            {Number(item.price).toLocaleString("en-IN")}
-                            {" × "}
-                            {item.quantity}
-                            {" = ₹"}
-                            {(
-                              Number(item.price) *
-                              Number(item.quantity)
-                            ).toLocaleString("en-IN")}
-                          </p>
-                        </div>
+                              {item.color && (
+                                <p className="small mb-1">
+                                  Color: {item.color}
+                                </p>
+                              )}
+
+                              <p className="small mb-0">
+                                Price: ₹
+                                {Number(item.price || 0).toLocaleString("en-IN")}
+                                {" × "}
+                                {item.quantity}
+                                {" = ₹"}
+                                {(
+                                  Number(item.price || 0) *
+                                  Number(item.quantity || 0)
+                                ).toLocaleString("en-IN")}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-secondary small">
+                          No products found for this order.
+                        </p>
+                      )}
+
+                      {/* DELIVERY ADDRESS */}
+                      <h6 className="fw-bold mt-3">
+                        Delivery Address
+                      </h6>
+
+                      <div className="bg-light rounded-3 p-3 small">
+                        <p className="fw-semibold mb-1">
+                          {order.deliveryAddress?.fullName || "N/A"}
+                        </p>
+
+                        <p className="mb-1">
+                          Phone:{" "}
+                          {order.deliveryAddress?.phone || "N/A"}
+                        </p>
+
+                        <p className="mb-0">
+                          {[
+                            order.deliveryAddress?.house,
+                            order.deliveryAddress?.area,
+                            order.deliveryAddress?.city,
+                            order.deliveryAddress?.state,
+                            order.deliveryAddress?.pincode,
+                          ]
+                            .filter(Boolean)
+                            .join(", ") || "Address unavailable"}
+                        </p>
                       </div>
-                    ))}
-
-                    {/* DELIVERY ADDRESS */}
-                    <h6 className="fw-bold mt-3">
-                      Delivery Address
-                    </h6>
-
-                    <div className="bg-light rounded-3 p-3 small">
-                      <p className="fw-semibold mb-1">
-                        {order.deliveryAddress?.fullName || "N/A"}
-                      </p>
-
-                      <p className="mb-1">
-                        Phone:{" "}
-                        {order.deliveryAddress?.phone || "N/A"}
-                      </p>
-
-                      <p className="mb-0">
-                        {[
-                          order.deliveryAddress?.house,
-                          order.deliveryAddress?.area,
-                          order.deliveryAddress?.city,
-                          order.deliveryAddress?.state,
-                          order.deliveryAddress?.pincode,
-                        ]
-                          .filter(Boolean)
-                          .join(", ")}
-                      </p>
                     </div>
-
-                  </div>
-                )}
-
+                  )}
               </div>
             ))}
-
           </div>
         )}
       </div>

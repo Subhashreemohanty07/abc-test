@@ -578,7 +578,8 @@ function AdminCustomerActivity({
             {/* ORDERS PLACED TAB */}
             {activeTab === "orders" && (
               <Orders
-                isAdmin={false}
+                isAdmin={true}
+                selectedCustomerId={selectedCustomerId}
                 orders={customerOrders}
               />
             )}
