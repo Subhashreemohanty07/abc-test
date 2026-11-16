@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import ProfileDetails from "../components/ProfileDetails";
 import AddressManager from "../components/AddressManger";
+import Orders from "../components/Orders";
 
 const API_URL =
   import.meta.env.VITE_API_URL ;
@@ -12,6 +13,9 @@ function Profile() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [ordersError, setOrdersError] = useState("");
 
   const navigate = useNavigate();
 
@@ -98,6 +102,63 @@ function Profile() {
 
     return () => controller.abort();
   }, [navigate]);
+
+  // FETCH LOGGED-IN CUSTOMER ORDERS
+useEffect(() => {
+  if (!user) return;
+
+  const controller = new AbortController();
+
+  async function fetchMyOrders() {
+    try {
+      setOrdersLoading(true);
+      setOrdersError("");
+
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        throw new Error("Please sign in to view your orders.");
+      }
+
+      const response = await fetch(
+        `${API_URL}/api/orders/my`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          signal: controller.signal,
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to fetch your orders."
+        );
+      }
+
+      if (!controller.signal.aborted) {
+        setOrders(
+          Array.isArray(data.orders) ? data.orders : []
+        );
+      }
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        setOrdersError(error.message);
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        setOrdersLoading(false);
+      }
+    }
+  }
+
+  fetchMyOrders();
+
+  return () => controller.abort();
+}, [user?._id]);
 
   // LOGOUT
   function handleLogout() {
@@ -189,45 +250,36 @@ function Profile() {
         </div>
 
         {/* CUSTOMER ORDERS */}
-        <div className="card border-0 shadow-sm rounded-4 mt-4">
-          <div className="card-body p-3 p-md-4">
+        <div className="mt-4">
+          {ordersLoading ? (
+            <div className="card border-0 shadow-sm rounded-4">
+              <div className="card-body text-center py-5">
+                <div
+                  className="spinner-border"
+                  style={{ color: "#fc2779" }}
+                  role="status"
+                >
+                  <span className="visually-hidden">
+                    Loading orders...
+                  </span>
+                </div>
 
-            <div className="d-flex align-items-center gap-3">
-
-              <div
-                className="rounded-3 d-flex align-items-center justify-content-center"
-                style={{
-                  width: "48px",
-                  height: "48px",
-                  backgroundColor: "#fff0f5",
-                  color: "#fc2779",
-                }}
-              >
-                <i className="bi bi-bag-check fs-4"></i>
-              </div>
-
-              <div className="flex-grow-1">
-                <h5 className="fw-bold mb-1">
-                  My Orders
-                </h5>
-
-                <p className="text-secondary small mb-0">
-                  View your order history and track your purchases.
+                <p className="text-secondary mt-3 mb-0">
+                  Loading your orders...
                 </p>
               </div>
-
-              <span
-                className="badge rounded-pill"
-                style={{
-                  backgroundColor: "#fff0f5",
-                  color: "#fc2779",
-                }}
-              >
-                Coming Soon
-              </span>
-
             </div>
-          </div>
+          ) : ordersError ? (
+            <div className="alert alert-danger">
+              {ordersError}
+            </div>
+          ) : (
+            <Orders
+              isAdmin={false}
+              isVendor={false}
+              orders={orders}
+            />
+          )}
         </div>
 
       </div>
