@@ -252,7 +252,7 @@ function Orders({
                     </button>
 
                     {/* CUSTOMER PDF DOWNLOAD BUTTON */}
-                    {!isAdmin && !isVendor (
+                    {!isAdmin && !isVendor && (
                       <button
                         type="button"
                         className="btn btn-sm btn-outline-success"
