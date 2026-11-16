@@ -5,6 +5,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 function Orders({
   isAdmin = false,
+  isVendor=false,
   customers = [],
   orders = [],
 }) {
@@ -104,12 +105,13 @@ function Orders({
               className="bi bi-bag-check me-2"
               style={{ color: "#fc2779" }}
             ></i>
-            {isAdmin ? "Customer Purchase Orders" : "My Orders"}
+            {isAdmin ? "Customer Purchase Orders" : isVendor ? "Store Orders" : "My Orders"}
           </h5>
 
           <p className="text-secondary small mb-0">
             {isAdmin
               ? "Select a customer to view their purchase history."
+              :isVendor ? "View customers who purchased products from your store." 
               : "View and track your purchase orders."}
           </p>
         </div>
@@ -199,6 +201,7 @@ function Orders({
             <p className="text-secondary small mb-0">
               {isAdmin
                 ? "No purchase orders found for this customer."
+                : isVendor ? "No customers have purchased products from your store yet."
                 : "You haven't placed any orders yet."}
             </p>
           </div>
@@ -231,7 +234,9 @@ function Orders({
                   <span className="fw-semibold">
                     Total: ₹
                     {Number(
-                      order.totalAmount || 0
+                      isVendor
+                        ? order.subtotal ?? 0
+                        : order.totalAmount ?? 0
                     ).toLocaleString("en-IN")}
                   </span>
 
@@ -247,7 +252,7 @@ function Orders({
                     </button>
 
                     {/* CUSTOMER PDF DOWNLOAD BUTTON */}
-                    {!isAdmin && (
+                    {!isAdmin && !isVendor (
                       <button
                         type="button"
                         className="btn btn-sm btn-outline-success"
@@ -278,6 +283,93 @@ function Orders({
                     {" | "}
                     {order.paymentStatus || "Pending"}
                   </p>
+                )}
+                {/* VENDOR ORDER DETAILS */}
+                {isVendor && (
+                  <div className="mt-3 border-top pt-3">
+
+                    {/* CUSTOMER DETAILS */}
+                    <h6 className="fw-bold">Customer Details</h6>
+
+                    <p className="small mb-1">
+                      <strong>Name:</strong> {order.customer?.name || "N/A"}
+                    </p>
+
+                    <p className="small mb-3">
+                      <strong>Email:</strong> {order.customer?.email || "N/A"}
+                    </p>
+
+                    {/* PURCHASED PRODUCTS */}
+                    <h6 className="fw-bold">Purchased Products</h6>
+
+                    {order.items?.map((item) => (
+                      <div
+                        key={item._id}
+                        className="d-flex gap-3 border rounded-3 p-2 mb-2"
+                      >
+                        {item.image && (
+                          <img
+                            src={item.image}
+                            alt={item.productName}
+                            style={{
+                              width: "65px",
+                              height: "65px",
+                              objectFit: "cover",
+                              borderRadius: "8px",
+                            }}
+                          />
+                        )}
+
+                        <div>
+                          <p className="fw-semibold small mb-1">
+                            {item.productName}
+                          </p>
+
+                          <p className="small text-secondary mb-1">
+                            Brand: {item.brand}
+                          </p>
+
+                          <p className="small mb-1">
+                            Quantity: {item.quantity}
+                          </p>
+
+                          <p className="small mb-0">
+                            Price: ₹{Number(item.price).toLocaleString("en-IN")}
+                            {" × "}
+                            {item.quantity}
+                            {" = "}
+                            ₹{(item.price * item.quantity).toLocaleString("en-IN")}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* DELIVERY ADDRESS */}
+                    <h6 className="fw-bold mt-3">Delivery Address</h6>
+
+                    <div className="bg-light rounded-3 p-3 small">
+                      <p className="fw-semibold mb-1">
+                        {order.deliveryAddress?.fullName || "N/A"}
+                      </p>
+
+                      <p className="mb-1">
+                        Phone: {order.deliveryAddress?.phone || "N/A"}
+                      </p>
+
+                      <p className="mb-0">
+                        {[
+                          order.deliveryAddress?.house,
+                          order.deliveryAddress?.area,
+                          order.deliveryAddress?.city,
+                          order.deliveryAddress?.state,
+                          order.deliveryAddress?.pincode,
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </p>
+                    </div>
+
+                  </div>
                 )}
               </div>
             ))}

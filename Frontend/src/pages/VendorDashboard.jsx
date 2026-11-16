@@ -5,11 +5,15 @@ import ProductTable from "../components/ProductTable";
 import AddProduct from "../components/AddProduct"
 import StoreProfile from "../components/StoreProfile";
 import EditProduct from "../components/EditProduct";
+import Orders from "../components/Orders";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 function VendorDashboard() {
   const [products, setProducts] = useState([]);
+  const [vendorOrders, setVendorOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState("");
 
   const [user, setUser] = useState(() => {
     try {
@@ -32,6 +36,10 @@ const handleMenuChange = (menu) => {
   if (menu !== activeMenu) {
     setMenuHistory((previous) => [...previous, activeMenu]);
     setActiveMenu(menu);
+  }
+
+  if (menu === "Orders") {
+    fetchVendorOrders();
   }
 
   setMobileMenuOpen(false);
@@ -98,6 +106,45 @@ const handleBack = () => {
 
     fetchVendorData();
   }, []);
+  // FETCH ORDERS FOR LOGGED-IN VENDOR
+  const fetchVendorOrders = async () => {
+    try {
+      setOrdersLoading(true);
+      setOrdersError("");
+
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        throw new Error("Please sign in again.");
+      }
+
+      const response = await fetch(
+        `${API_URL}/api/orders/vendor`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to fetch vendor orders."
+        );
+      }
+
+      setVendorOrders(data.orders || []);
+    } catch (error) {
+      console.error("Vendor orders error:", error);
+      setOrdersError(
+        error.message || "Unable to fetch vendor orders."
+      );
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
 
   // Refresh vendor products
   const fetchMyProducts = async () => {
@@ -619,22 +666,57 @@ const handleBack = () => {
             <StoreProfile vendor={user} />
           )}
 
-          {/* ORDERS */}
+          {/* VENDOR ORDERS */}
           {activeMenu === "Orders" && (
-            <div className="card border-0 shadow-sm rounded-4">
-              <div className="card-body p-5 text-center">
-                <i className="bi bi-receipt fs-1 text-secondary"></i>
+            <>
+              {ordersLoading ? (
+                <div className="text-center py-5">
+                  <div
+                    className="spinner-border"
+                    style={{ color: "#fc2779" }}
+                    role="status"
+                  >
+                    <span className="visually-hidden">
+                      Loading orders...
+                    </span>
+                  </div>
 
-                <h5 className="fw-bold mt-3">
-                  Orders
-                </h5>
+                  <p className="text-secondary mt-3">
+                    Loading customer orders...
+                  </p>
+                </div>
+              ) : ordersError ? (
+                <div className="alert alert-danger">
+                  <p className="mb-2">{ordersError}</p>
 
-                <p className="text-secondary mb-0">
-                  Your order management section will be available
-                  when we connect the orders API.
-                </p>
-              </div>
-            </div>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-danger"
+                    onClick={fetchVendorOrders}
+                  >
+                    Try Again
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="d-flex justify-content-end mb-3">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-secondary"
+                      onClick={fetchVendorOrders}
+                    >
+                      <i className="bi bi-arrow-clockwise me-2"></i>
+                      Refresh Orders
+                    </button>
+                  </div>
+
+                  <Orders
+                    isVendor={true}
+                    orders={vendorOrders}
+                  />
+                </>
+              )}
+            </>
           )}
 
         </main>
