@@ -16,6 +16,7 @@ import CustomerWishlist from "./pages/CustomerWishlist";
 import AcceptAdminInvite from "./pages/AcceptAdminInvite";
 import ProtectedRoute from "./pages/ProtectedRoute";
 import OrderSuccess from "./pages/OrderSuccess";
+import ScrollToTop from "./components/ScrollToTop";
 
 
 function RoleBasedHome() {
@@ -43,6 +44,7 @@ function RoleBasedHome() {
 function App() {
   return (
     <BrowserRouter>
+    <ScrollToTop />
       <Routes>
         <Route path="/" element={<RoleBasedHome />} />
         <Route path="/signin" element={<Signin />} />
