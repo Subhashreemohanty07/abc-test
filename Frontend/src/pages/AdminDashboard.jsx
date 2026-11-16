@@ -14,6 +14,9 @@ function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [products, setProducts] = useState([]);
+  const [adminOrders, setAdminOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState("");
 
   const [user, setUser] = useState(() => {
     try {
@@ -109,16 +112,67 @@ function AdminDashboard() {
     fetchDashboardData();
   }, []);
 
+
+  // FETCH ALL CUSTOMER ORDERS FOR ADMIN
+  const fetchAdminOrders = async () => {
+    try {
+      setOrdersLoading(true);
+      setOrdersError("");
+
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        throw new Error("Admin login required.");
+      }
+
+      const response = await fetch(
+        `${API_URL}/api/orders/admin`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Failed to fetch customer orders."
+        );
+      }
+
+      setAdminOrders(
+        Array.isArray(data.orders) ? data.orders : []
+      );
+    } catch (error) {
+      console.error("Admin orders error:", error);
+      setOrdersError(error.message);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+
   // CHANGE SIDEBAR MENU
   const [menuHistory, setMenuHistory] = useState([]);
 
-  const handleMenuChange = (menu) => {
-    if (menu !== activeMenu) {
-      setMenuHistory((previous) => [...previous, activeMenu]);
-      setActiveMenu(menu);
-    }
-    setMobileMenuOpen(false);
-  };
+  
+const handleMenuChange = (menu) => {
+  if (menu !== activeMenu) {
+    setMenuHistory((previous) => [...previous, activeMenu]);
+    setActiveMenu(menu);
+  }
+
+  // Fetch customer orders when Admin opens Orders
+  if (menu === "Orders") {
+    fetchAdminOrders();
+  }
+
+  setMobileMenuOpen(false);
+};
+
 
   const handleBack = () => {
     if (menuHistory.length > 0) {
@@ -716,15 +770,45 @@ const menuItems = [
               </>
             )}
 
-            {/* CUSTOMER ACTIVITY */}
-            {activeMenu === "Orders" && (
-              <AdminCustomerActivity
-                customers={customers}
-                orders={[]}
-                wishlist={[]}
-                cartItems={[]}
-              />
-            )}
+            
+              {/* CUSTOMER ACTIVITY */}
+              {activeMenu === "Orders" && (
+                <>
+                  {ordersLoading ? (
+                    <div className="text-center py-5">
+                      <div
+                        className="spinner-border"
+                        style={{ color: "#fc2779" }}
+                        role="status"
+                      >
+                        <span className="visually-hidden">
+                          Loading orders...
+                        </span>
+                      </div>
+                      <p className="text-secondary mt-3">
+                        Loading customer orders...
+                      </p>
+                    </div>
+                  ) : ordersError ? (
+                    <div className="alert alert-danger">
+                      <p className="mb-2">{ordersError}</p>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-danger"
+                        onClick={fetchAdminOrders}
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  ) : (
+                    <AdminCustomerActivity
+                      customers={customers}
+                      orders={adminOrders}
+                    />
+                  )}
+                </>
+              )}
+
 
             {/* ADMIN PROFILE */}
             {activeMenu === "Profile" && (
