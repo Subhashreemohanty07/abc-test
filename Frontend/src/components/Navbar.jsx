@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import NotificationBell from "./NotificationBell";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -593,6 +594,10 @@ function Navbar() {
                 Sign In
               </Link>
             )}
+            {/* CUSTOMER NOTIFICATION BELL */}
+            {!loading && user?.role === "customer" && (
+              <NotificationBell />
+            )}
 
             {/* WISHLIST ICON BEFORE CART */}
             <button
@@ -751,6 +756,20 @@ function Navbar() {
                 <i className="bi bi-person"></i>
                 {" "}Sign In
               </Link>
+            )}
+            {/* MOBILE NOTIFICATIONS */}
+            {!loading && user?.role === "customer" && (
+              <div
+                style={{
+                  padding: "8px 15px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                }}
+              >
+                <span>Notifications</span>
+                <NotificationBell onNavigate={closeMenu} />
+              </div>
             )}
 
             {/* MOBILE WISHLIST */}

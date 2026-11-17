@@ -17,6 +17,7 @@ import AcceptAdminInvite from "./pages/AcceptAdminInvite";
 import ProtectedRoute from "./pages/ProtectedRoute";
 import OrderSuccess from "./pages/OrderSuccess";
 import ScrollToTop from "./components/ScrollToTop";
+import Notifications from "./pages/Notifications";
 
 
 function RoleBasedHome() {
@@ -56,6 +57,7 @@ function App() {
         <Route path="/products/:id" element={<ProductDetails />} />
         <Route path="/wishlist" element={<CustomerWishlist />} />
         <Route path="/cart" element={<Cart />} />
+        <Route path="/notifications" element={<Notifications />} />
         <Route path="/checkout" element={<Checkout />}/>
         <Route path="/order-success" element={<OrderSuccess />} />
         <Route path="/admin-dashboard" element={<ProtectedRoute allowedRoles={["admin"]}><AdminDashboard /></ProtectedRoute>}/>

@@ -5,6 +5,10 @@ import User from "../models/User.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 import upload from "../middleware/uploadMiddleware.js";
 import cloudinary from "../config/cloudinary.js";
+import { createPriceDropNotifications } from "../services/bellNotification.js";
+import { sendPriceDropEmails } from "../services/emailNotification.js";
+
+
 
 const router = express.Router();
 
@@ -58,6 +62,14 @@ const uploadToCloudinary = (file) => {
   return cloudinary.uploader.upload(dataUri, {
     folder: "nykaa-products"
   });
+};
+
+
+
+const getSellingPrice = (product) => {
+  return product.discountPrice != null
+    ? Number(product.discountPrice)
+    : Number(product.price);
 };
 
 // 1. Get all products
@@ -269,6 +281,9 @@ router.put(
         colors
       } = req.body;
 
+      const oldSellingPrice = getSellingPrice(product);
+
+
       // Calculate the updated price and discount
       const updatedPrice =
         price !== undefined ? Number(price) : product.price;
@@ -367,6 +382,25 @@ router.put(
       // Save updated product
       await product.save();
 
+    
+      const newSellingPrice = getSellingPrice(product);
+
+      if (newSellingPrice < oldSellingPrice) {
+        try {
+          await createPriceDropNotifications({
+            product,
+            oldPrice: oldSellingPrice,
+            newPrice: newSellingPrice,
+          });
+
+          await sendPriceDropEmails(product);
+        } catch (notificationError) {
+          console.error(
+            "Price-drop notification/email error:",
+            notificationError
+          );
+        }
+      }
       // Delete old images only after successful save
       if (newlyUploadedImages.length) {
         for (const image of oldImages) {

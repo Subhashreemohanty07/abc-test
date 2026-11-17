@@ -9,6 +9,8 @@ import wishlistRoutes from "./routes/wishlistRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
 import addressRoutes from "./routes/addressRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
+import reminderRoutes from "./routes/remainderRoutes.js";
 
 dotenv.config();
 
@@ -23,6 +25,8 @@ app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/addresses", addressRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/reminders", reminderRoutes);
 
 app.get("/", (req, res) => {
   res.send("Nykaa backend is running!");
