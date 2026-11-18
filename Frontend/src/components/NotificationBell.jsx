@@ -268,14 +268,22 @@ function NotificationBell({ onNavigate }) {
                   {notification.title}
                 </strong>
 
+                
                 {!notification.isRead && (
-                  <span
-                    className="badge rounded-circle bg-danger p-1 flex-shrink-0"
+                <span
+                    className="rounded-circle flex-shrink-0"
                     aria-label="Unread"
-                  >
-                    &nbsp;
-                  </span>
+                    style={{
+                    width: "8px",
+                    height: "8px",
+                    minWidth: "8px",
+                    backgroundColor: "#fc2779",
+                    display: "inline-block",
+                    marginTop: "5px",
+                    }}
+                />
                 )}
+
               </div>
 
               <p className="small text-secondary my-2 text-break">

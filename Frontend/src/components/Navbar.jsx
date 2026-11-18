@@ -653,13 +653,25 @@ function Navbar() {
         {/* MOBILE MENU */}
         {menuOpen && (
           <div className="mobile-menu d-flex flex-column">
-            <Link
-              to="/products"
-              onClick={closeMenu}
-            >
-              All Products
-            </Link>
 
+            {/* CUSTOMER NAME FIRST */}
+            {loading ? (
+              <span className="px-3 py-2">
+                Loading account...
+              </span>
+            ) : user ? (
+              <div className="mobile-user">
+                <i className="bi bi-person-circle me-2"></i>
+                Hello, {user.name}
+              </div>
+            ) : (
+              <Link to="/signin" onClick={closeMenu}>
+                <i className="bi bi-person me-2"></i>
+                Sign In
+              </Link>
+            )}
+
+            {/* SEARCH */}
             <form
               className="mobile-search d-flex gap-2"
               onSubmit={handleSearch}
@@ -668,17 +680,20 @@ function Navbar() {
                 type="search"
                 placeholder="Search on Nykaa"
                 value={search}
-                onChange={(e) =>
-                  setSearch(e.target.value)
-                }
+                onChange={(e) => setSearch(e.target.value)}
               />
 
-              <button type="submit">
+              <button type="submit" aria-label="Search">
                 <i className="bi bi-search"></i>
               </button>
             </form>
 
-            {/* MOBILE CATEGORIES */}
+            {/* ALL PRODUCTS */}
+            <Link to="/products" onClick={closeMenu}>
+              All Products
+            </Link>
+
+            {/* MEN'S AND WOMEN'S CATEGORIES */}
             {categories.map((category) => (
               <div
                 className="mobile-category"
@@ -694,6 +709,7 @@ function Navbar() {
                         : category.id
                     )
                   }
+                  aria-expanded={activeCategory === category.id}
                 >
                   {category.label}
                   <i className="bi bi-chevron-down"></i>
@@ -702,15 +718,10 @@ function Navbar() {
                 {activeCategory === category.id && (
                   <div className="mobile-category-list">
                     {category.columns
-                      .flatMap(
-                        (column) => column.links
-                      )
+                      .flatMap((column) => column.links)
                       .map((link) => (
                         <Link
-                          to={getCategoryLink(
-                            category.id,
-                            link
-                          )}
+                          to={getCategoryLink(category.id, link)}
                           key={link}
                           onClick={closeMenu}
                         >
@@ -722,60 +733,25 @@ function Navbar() {
               </div>
             ))}
 
-            {/* MOBILE ACCOUNT */}
-            {loading ? (
-              <span>
-                Loading account...
-              </span>
-            ) : user ? (
-              <>
-                <div className="mobile-user">
-                  <i className="bi bi-person-circle"></i>
-                  Hello, {user.name}
-                </div>
-
-                <Link
-                  to="/profile"
-                  onClick={closeMenu}
-                >
-                  My Profile
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                >
-                  Logout
-                </button>
-              </>
-            ) : (
-              <Link
-                to="/signin"
-                onClick={closeMenu}
-              >
-                <i className="bi bi-person"></i>
-                {" "}Sign In
-              </Link>
-            )}
-            {/* MOBILE NOTIFICATIONS */}
+            {/* NOTIFICATIONS */}
             {!loading && user?.role === "customer" && (
               <div
-                style={{
-                  padding: "8px 15px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                }}
+                className="d-flex align-items-center justify-content-between"
+                style={{ padding: "8px 15px", gap: "10px" }}
               >
-                <span>Notifications</span>
+                <span>
+                  <i className="bi bi-bell me-2"></i>
+                  Notifications
+                </span>
                 <NotificationBell onNavigate={closeMenu} />
               </div>
             )}
 
-            {/* MOBILE WISHLIST */}
+            {/* WISHLIST */}
             <button
               type="button"
               onClick={handleWishlist}
+              className="text-start"
             >
               <i
                 className="bi bi-heart me-2"
@@ -784,16 +760,46 @@ function Navbar() {
               My Wishlist ({wishlistCount})
             </button>
 
-            {/* MOBILE CART */}
+            {/* SHOPPING CART */}
             <button
               type="button"
               onClick={handleCart}
+              className="text-start"
             >
-              <i className="bi bi-bag"></i>
-              {" "}Shopping Cart ({cartCount})
+              <i className="bi bi-bag me-2"></i>
+              Shopping Cart ({cartCount})
             </button>
+
+            {/* MY PROFILE */}
+            {!loading && user && (
+              <Link
+                to={getProfilePath()}
+                onClick={closeMenu}
+              >
+                <i className="bi bi-person-circle me-2"></i>
+                My Profile
+              </Link>
+            )}
+
+            {/* LOGOUT LAST */}
+            {!loading && user && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="text-start"
+                style={{
+                  color: "#dc3545",
+                  fontWeight: "600",
+                }}
+              >
+                <i className="bi bi-box-arrow-right me-2"></i>
+                Logout
+              </button>
+            )}
+
           </div>
         )}
+
       </nav>
     </div>
   );
