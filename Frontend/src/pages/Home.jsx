@@ -2,6 +2,7 @@
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import "./Home.css";
+import { Link } from "react-router-dom";
 
 function Home() {
   return (
@@ -29,7 +30,9 @@ function Home() {
           <div>
             <h2>NYKAA LUXE</h2>
             <p>EXCLUSIVE OFFERS ON YOUR FAVOURITES</p>
+            <Link to="/products" className="text-decoration-none">
             <strong>SHOP NOW</strong>
+            </Link>
           </div>
         </section>
 
@@ -52,7 +55,9 @@ function Home() {
                 />
 
                 <h3>Women's Collection</h3>
-                <a href="#women">Explore Now</a>
+                <Link to="/products?category=women">
+                Explore Now
+                </Link>
               </div>
             </div>
 
@@ -65,7 +70,9 @@ function Home() {
                 />
 
                 <h3>Men's Collection</h3>
-                <a href="#men">Explore Now</a>
+                <Link to="/products?category=men">
+                  Explore Now
+                </Link>
               </div>
             </div>
 
@@ -78,7 +85,9 @@ function Home() {
                 />
 
                 <h3>New Arrivals</h3>
-                <a href="#brands">Explore Now</a>
+                <Link to="/products?sort=newest">
+                Explore Now
+              </Link>
               </div>
             </div>
 

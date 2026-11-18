@@ -202,9 +202,11 @@ function ProductListing() {
   );
 
   // Keep category and subcategory in sync with URL
+  
   useEffect(() => {
     const category = searchParams.get("category");
     const subCategory = searchParams.get("subCategory");
+    const sort = searchParams.get("sort");
 
     setSelectedCategory(
       category ? [category.toLowerCase()] : []
@@ -213,7 +215,12 @@ function ProductListing() {
     setSelectedSubCategory(
       subCategory ? [subCategory] : []
     );
+
+    setSortBy(
+      sort === "newest" ? "newest" : "recommended"
+    );
   }, [searchParams]);
+
 
   // FETCH PRODUCTS
   useEffect(() => {
@@ -875,7 +882,13 @@ function ProductListing() {
             role="dialog"
             aria-modal="true"
             aria-label="Product filters"
-            style={{ visibility: "visible" }}
+            style={{
+            visibility: "visible",
+            height: "100dvh",
+            maxHeight: "100dvh",
+            display: "flex",
+            flexDirection: "column",
+          }}
           >
             <div className="offcanvas-header border-bottom">
               <h5 className="offcanvas-title fw-bold">
@@ -890,18 +903,39 @@ function ProductListing() {
               ></button>
             </div>
 
-            <div className="offcanvas-body">
+            <div
+              className="offcanvas-body overflow-auto"
+              style={{
+                padding: "20px 18px 28px",
+                minHeight: 0,
+              }}
+            >
               <FilterPanel {...filterProps} />
             </div>
+            <div
+              className="p-3 border-top bg-white"
+              style={{
+                paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+              }}
+            >
+              <div className="d-flex gap-2">
+                <button
+                  type="button"
+                  className="btn btn-outline-danger"
+                  style={{ minWidth: "100px" }}
+                  onClick={clearFilters}
+                >
+                  Clear All
+                </button>
 
-            <div className="p-3 border-top bg-white">
-              <button
-                type="button"
-                className="btn btn-danger w-100"
-                onClick={() => setShowMobileFilters(false)}
-              >
-                Show {filteredProducts.length} Products
-              </button>
+                <button
+                  type="button"
+                  className="btn btn-danger flex-grow-1"
+                  onClick={() => setShowMobileFilters(false)}
+                >
+                  Show {filteredProducts.length} Products
+                </button>
+              </div>
             </div>
           </div>
         </>
