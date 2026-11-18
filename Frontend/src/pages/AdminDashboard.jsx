@@ -7,6 +7,7 @@ import ProductTable from "../components/ProductTable";
 import EditProduct from "../components/EditProduct";
 import AdminCustomerActivity from "../components/AdminCustomerActivity";
 import ProfileDetails from "../components/ProfileDetails";
+import AdminNotifications from "../components/AdminNotifications";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -302,6 +303,7 @@ const menuItems = [
   { name: "Vendors", icon: "bi-shop" },
   { name: "Products", icon: "bi-bag-fill" },
   { name: "Orders", icon: "bi-receipt" },
+  { name: "Send Notification", icon: "bi-bell-fill" },
   { name: "Profile", icon: "bi-person-circle" },
 ];
 
@@ -808,6 +810,12 @@ const menuItems = [
                   )}
                 </>
               )}
+
+            {/* ADMIN NOTIFICATIONS */}
+            {activeMenu === "Send Notification" && (
+              <AdminNotifications />
+            )}
+
 
 
             {/* ADMIN PROFILE */}

@@ -3,6 +3,9 @@ import express from "express";
 import mongoose from "mongoose";
 import Notification from "../models/Notification.js";
 import authMiddleware from "../middleware/authMiddleware.js";
+import crypto from "node:crypto";
+import User from "../models/User.js";
+import { sendNotificationEmail } from "../services/emailService.js";
 
 const router = express.Router();
 
@@ -160,5 +163,126 @@ router.patch("/:id/read", requireCustomer, async (req, res) => {
     });
   }
 });
+
+
+//
+// ADMIN - SEND NOTIFICATION TO ALL CUSTOMERS
+//
+
+const requireAdmin = (req, res, next) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({
+      message: "Only admins can send notifications.",
+    });
+  }
+
+  next();
+};
+
+router.post("/admin/send", requireAdmin, async (req, res) => {
+  try {
+    const { title, message, link = "" } = req.body;
+
+    // Validate notification details
+    if (
+      typeof title !== "string" ||
+      typeof message !== "string" ||
+      !title.trim() ||
+      !message.trim() ||
+      title.trim().length > 120 ||
+      message.trim().length > 1000
+    ) {
+      return res.status(400).json({
+        message: "Valid title and message are required.",
+      });
+    }
+
+    if (
+      typeof link !== "string" ||
+      (link &&
+        (!link.startsWith("/") ||
+          link.startsWith("//") ||
+          link.startsWith("/\\")))
+    ) {
+      return res.status(400).json({
+        message: "Invalid notification link.",
+      });
+    }
+
+    // Find all registered customers
+    const customers = await User.find({
+      role: "customer",
+    }).select("_id name email");
+
+    // Unique ID for this announcement
+    const campaignId = crypto.randomUUID();
+    const dedupeKey = `admin-promotion:${campaignId}`;
+
+    let notificationsCreated = 0;
+    let emailsSent = 0;
+
+    for (const customer of customers) {
+      // Create one bell notification per customer
+      const notification = await Notification.create({
+        user: customer._id,
+        title: title.trim(),
+        message: message.trim(),
+        type: "promotion",
+        link,
+        isRead: false,
+        emailSent: false,
+        dedupeKey,
+      });
+
+      notificationsCreated++;
+
+      // Send email to the customer
+      if (!customer.email) continue;
+
+      try {
+        const result = await sendNotificationEmail({
+          to: customer.email,
+          subject: title.trim(),
+          message: `Hi ${customer.name || "there"},
+
+            ${message.trim()}
+
+            Visit Nykaa Clone for more details.
+
+            Happy Shopping!
+            Nykaa Clone Team`,
+                    });
+
+        if (result.accepted?.includes(customer.email)) {
+          await Notification.updateOne(
+            { _id: notification._id },
+            { $set: { emailSent: true } }
+          );
+
+          emailsSent++;
+        }
+      } catch (emailError) {
+        console.error(
+          "Admin notification email error:",
+          emailError.message
+        );
+      }
+    }
+
+    return res.status(200).json({
+      message: "Admin notification processing completed.",
+      totalCustomers: customers.length,
+      notificationsCreated,
+      emailsSent,
+    });
+  } catch (error) {
+    console.error("Admin notification error:", error);
+
+    return res.status(500).json({
+      message: "Unable to send admin notification.",
+    });
+  }
+});
+
 
 export default router;
