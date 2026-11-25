@@ -1,6 +1,36 @@
 
 import mongoose from "mongoose";
 
+const variantSchema = new mongoose.Schema(
+  {
+    size: {
+      type: String,
+      required: true,
+      trim: true
+    },
+
+    color: {
+      type: String,
+      required: true,
+      trim: true
+    },
+
+    stock: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+      validate: {
+        validator: Number.isSafeInteger,
+        message: "Variant stock must be a whole number"
+      }
+    }
+  },
+  {
+    _id: false
+  }
+);
+
 const productSchema = new mongoose.Schema(
   {
     // 1. Basic product information
@@ -75,15 +105,35 @@ const productSchema = new mongoose.Schema(
       required: true
     },
 
-    // 9. Available stock
-    stock: {
-      type: Number,
-      required: true,
-      min: 0,
-      default: 0
+    // 9. Size and colour-wise inventory
+    variants: {
+      type: [variantSchema],
+      default: [],
+      validate: {
+        validator: function (variants) {
+          const combinations = variants.map((variant) =>
+            JSON.stringify([variant.size, variant.color])
+          );
+
+          return new Set(combinations).size === combinations.length;
+        },
+        message: "Duplicate size and colour combinations are not allowed"
+      }
     },
 
-    // 10. Product rating
+    // 10. Available stock
+    stock: {
+    type: Number,
+    required: true,
+    min: 0,
+    default: 0,
+    validate: {
+      validator: Number.isSafeInteger,
+      message: "Total stock must be a valid whole number"
+      }
+    },
+
+    // 11. Product rating
     rating: {
       type: Number,
       default: 0,
@@ -97,7 +147,7 @@ const productSchema = new mongoose.Schema(
       min:0
     },
 
-    // 11. Vendor who added the product
+    // 12. Vendor who added the product
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -105,7 +155,8 @@ const productSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true
+    timestamps: true,
+    optimisticConcurrency: true
   }
 );
 

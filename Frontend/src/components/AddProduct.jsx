@@ -1,5 +1,11 @@
 
 import { useState } from "react";
+import SizeSelector from "./SizeSelector";
+import ColorSelector from "./ColorSelector";
+import VariantStockManager, {
+  generateVariants,
+  calculateTotalStock
+} from "./VariantStockManager";
 
 const API_URL = `${import.meta.env.VITE_API_URL}/api/products`;
 
@@ -14,57 +20,93 @@ function AddProduct({ onProductAdded, onCancel }) {
     discountPrice: "",
     sizes: [],
     colors: [],
-    stock: ""
+    variants: []
   });
 
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  const sizeOptions = ["XS", "S", "M", "L", "XL", "XXL"];
-  const colorOptions = [
-    "Black", "White", "Red", "Blue",
-    "Pink", "Green", "Yellow", "Brown"
-  ];
-
+  // Handle normal form fields
   function handleChange(event) {
     const { name, value } = event.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value
-    }));
-  }
-
-  function handleCheckboxChange(event, field) {
-    const { value, checked } = event.target;
 
     setFormData((prev) => ({
       ...prev,
-      [field]: checked
-        ? [...prev[field], value]
-        : prev[field].filter((item) => item !== value)
+      [name]: value,
+      ...(name === "category" ? { subCategory: "" } : {})
     }));
   }
 
+  // Update selected sizes and generate variants
+  function handleSizeChange(updatedSizes) {
+    setFormData((prev) => ({
+      ...prev,
+      sizes: updatedSizes,
+      variants: generateVariants(
+        updatedSizes,
+        prev.colors,
+        prev.variants
+      )
+    }));
+  }
+
+  // Update selected colours and generate variants
+  function handleColorChange(updatedColors) {
+    setFormData((prev) => ({
+      ...prev,
+      colors: updatedColors,
+      variants: generateVariants(
+        prev.sizes,
+        updatedColors,
+        prev.variants
+      )
+    }));
+  }
+
+  // Update individual variant stock
+  function handleVariantChange(updatedVariants) {
+    setFormData((prev) => ({
+      ...prev,
+      variants: updatedVariants
+    }));
+  }
+
+  // Handle product images
   function handleImageChange(event) {
     const selectedImages = Array.from(event.target.files);
 
     if (selectedImages.length > 5) {
       setMessage("You can upload a maximum of 5 images.");
+      setImages([]);
       event.target.value = "";
       return;
     }
 
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp"
+    ];
 
-    if (selectedImages.some((file) => !allowedTypes.includes(file.type))) {
+    if (
+      selectedImages.some(
+        (file) => !allowedTypes.includes(file.type)
+      )
+    ) {
       setMessage("Only JPG, PNG and WEBP images are allowed.");
+      setImages([]);
       event.target.value = "";
       return;
     }
 
-    if (selectedImages.some((file) => file.size > 5 * 1024 * 1024)) {
+    if (
+      selectedImages.some(
+        (file) => file.size > 5 * 1024 * 1024
+      )
+    ) {
       setMessage("Each image must be smaller than 5 MB.");
+      setImages([]);
       event.target.value = "";
       return;
     }
@@ -73,33 +115,80 @@ function AddProduct({ onProductAdded, onCancel }) {
     setMessage("");
   }
 
+  // Submit product
   async function handleSubmit(event) {
     event.preventDefault();
+
+    if (loading) return;
+
     setMessage("");
 
+    // Validate images
     if (images.length === 0) {
       setMessage("Please upload at least one product image.");
       return;
     }
 
-    if (Number(formData.price) <= 0) {
+    // Validate original price
+    if (
+      !Number.isFinite(Number(formData.price)) ||
+      Number(formData.price) <= 0
+    ) {
       setMessage("Please enter a valid product price.");
       return;
     }
 
+    // Validate discount price
     if (
-      formData.discountPrice &&
-      Number(formData.discountPrice) > Number(formData.price)
+      formData.discountPrice !== "" &&
+      (
+        !Number.isFinite(Number(formData.discountPrice)) ||
+        Number(formData.discountPrice) < 0 ||
+        Number(formData.discountPrice) > Number(formData.price)
+      )
     ) {
-      setMessage("Discount price cannot be greater than the original price.");
+      setMessage(
+        "Discount price must be between zero and the original price."
+      );
       return;
     }
 
+    // Validate selected sizes and colours
     if (!formData.sizes.length || !formData.colors.length) {
       setMessage("Please select at least one size and one colour.");
       return;
     }
 
+    // Validate variant availability
+    if (!formData.variants.length) {
+      setMessage("Please configure product variant inventory.");
+      return;
+    }
+
+    // Validate every variant stock
+    const invalidVariant = formData.variants.some(
+      (variant) =>
+        variant.stock === "" ||
+        !Number.isSafeInteger(variant.stock) ||
+        variant.stock < 0
+    );
+
+    if (invalidVariant) {
+      setMessage(
+        "Please enter a valid whole-number stock for every variant."
+      );
+      return;
+    }
+
+    // Calculate total product stock
+    const totalStock = calculateTotalStock(formData.variants);
+
+    if (!Number.isSafeInteger(totalStock)) {
+      setMessage("Invalid total stock quantity.");
+      return;
+    }
+
+    // Get authentication token
     const token = localStorage.getItem("token");
 
     if (!token) {
@@ -107,9 +196,15 @@ function AddProduct({ onProductAdded, onCancel }) {
       return;
     }
 
+    // Prepare product data
     const productData = new FormData();
 
-    Object.entries(formData).forEach(([key, value]) => {
+    const productPayload = {
+      ...formData,
+      stock: totalStock
+    };
+
+    Object.entries(productPayload).forEach(([key, value]) => {
       if (Array.isArray(value)) {
         productData.append(key, JSON.stringify(value));
       } else {
@@ -117,6 +212,7 @@ function AddProduct({ onProductAdded, onCancel }) {
       }
     });
 
+    // Append product images
     images.forEach((image) => {
       productData.append("images", image);
     });
@@ -135,11 +231,14 @@ function AddProduct({ onProductAdded, onCancel }) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Unable to add product.");
+        throw new Error(
+          data.message || "Unable to add product."
+        );
       }
 
       setMessage("Product added successfully!");
 
+      // Reset form after successful submission
       setFormData({
         productName: "",
         description: "",
@@ -150,13 +249,16 @@ function AddProduct({ onProductAdded, onCancel }) {
         discountPrice: "",
         sizes: [],
         colors: [],
-        stock: ""
+        variants: []
       });
 
       setImages([]);
 
       const fileInput = document.getElementById("productImages");
-      if (fileInput) fileInput.value = "";
+
+      if (fileInput) {
+        fileInput.value = "";
+      }
 
       onProductAdded?.(data.product || data);
 
@@ -170,16 +272,25 @@ function AddProduct({ onProductAdded, onCancel }) {
   return (
     <div className="card border-0 shadow-sm rounded-4">
       <div className="card-body p-4">
-        <h4 className="fw-bold mb-1">Add New Product</h4>
+
+        <h4 className="fw-bold mb-1">
+          Add New Product
+        </h4>
+
         <p className="text-secondary mb-4">
-          Enter your product details and upload product images.
+          Enter your product details, configure variant
+          inventory and upload product images.
         </p>
 
         <form onSubmit={handleSubmit}>
           <div className="row g-3">
 
+            {/* Product Name */}
             <div className="col-md-6">
-              <label className="form-label">Product Name *</label>
+              <label className="form-label">
+                Product Name *
+              </label>
+
               <input
                 type="text"
                 name="productName"
@@ -190,8 +301,12 @@ function AddProduct({ onProductAdded, onCancel }) {
               />
             </div>
 
+            {/* Brand */}
             <div className="col-md-6">
-              <label className="form-label">Brand *</label>
+              <label className="form-label">
+                Brand *
+              </label>
+
               <input
                 type="text"
                 name="brand"
@@ -202,8 +317,12 @@ function AddProduct({ onProductAdded, onCancel }) {
               />
             </div>
 
+            {/* Description */}
             <div className="col-12">
-              <label className="form-label">Description *</label>
+              <label className="form-label">
+                Description *
+              </label>
+
               <textarea
                 name="description"
                 className="form-control"
@@ -214,8 +333,12 @@ function AddProduct({ onProductAdded, onCancel }) {
               />
             </div>
 
+            {/* Category */}
             <div className="col-md-6">
-              <label className="form-label">Category *</label>
+              <label className="form-label">
+                Category *
+              </label>
+
               <select
                 name="category"
                 className="form-select"
@@ -227,8 +350,12 @@ function AddProduct({ onProductAdded, onCancel }) {
               </select>
             </div>
 
+            {/* Subcategory */}
             <div className="col-md-6">
-              <label className="form-label">Subcategory *</label>
+              <label className="form-label">
+                Subcategory *
+              </label>
+
               <select
                 name="subCategory"
                 className="form-select"
@@ -236,19 +363,42 @@ function AddProduct({ onProductAdded, onCancel }) {
                 onChange={handleChange}
                 required
               >
-                <option value="">Select subcategory</option>
+                <option value="">
+                  Select subcategory
+                </option>
+
                 {(
                   formData.category === "men"
-                    ? ["T-Shirts", "Shirts", "Jeans", "Trousers", "Jackets", "Ethnic Wear"]
-                    : ["Tops", "Dresses", "Jeans", "Kurtis", "Sarees", "Ethnic Wear"]
+                    ? [
+                        "T-Shirts",
+                        "Shirts",
+                        "Jeans",
+                        "Trousers",
+                        "Jackets",
+                        "Ethnic Wear"
+                      ]
+                    : [
+                        "Tops",
+                        "Dresses",
+                        "Jeans",
+                        "Kurtis",
+                        "Sarees",
+                        "Ethnic Wear"
+                      ]
                 ).map((item) => (
-                  <option key={item} value={item}>{item}</option>
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
                 ))}
               </select>
             </div>
 
+            {/* Original Price */}
             <div className="col-md-6">
-              <label className="form-label">Original Price (₹) *</label>
+              <label className="form-label">
+                Original Price (₹) *
+              </label>
+
               <input
                 type="number"
                 name="price"
@@ -260,8 +410,12 @@ function AddProduct({ onProductAdded, onCancel }) {
               />
             </div>
 
+            {/* Discount Price */}
             <div className="col-md-6">
-              <label className="form-label">Discount Price (₹)</label>
+              <label className="form-label">
+                Discount Price (₹)
+              </label>
+
               <input
                 type="number"
                 name="discountPrice"
@@ -272,59 +426,30 @@ function AddProduct({ onProductAdded, onCancel }) {
               />
             </div>
 
-            <div className="col-md-6">
-              <label className="form-label">Available Stock *</label>
-              <input
-                type="number"
-                name="stock"
-                className="form-control"
-                min="0"
-                value={formData.stock}
-                onChange={handleChange}
-                required
-              />
-            </div>
+            {/* Reusable Size Selector */}
+            <SizeSelector
+              selectedSizes={formData.sizes}
+              onChange={handleSizeChange}
+            />
 
-            <div className="col-12">
-              <label className="form-label d-block">Available Sizes *</label>
-              {sizeOptions.map((size) => (
-                <div className="form-check form-check-inline" key={size}>
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id={`size-${size}`}
-                    value={size}
-                    checked={formData.sizes.includes(size)}
-                    onChange={(event) => handleCheckboxChange(event, "sizes")}
-                  />
-                  <label className="form-check-label" htmlFor={`size-${size}`}>
-                    {size}
-                  </label>
-                </div>
-              ))}
-            </div>
+            {/* Reusable Colour Selector */}
+            <ColorSelector
+              selectedColors={formData.colors}
+              onChange={handleColorChange}
+            />
 
-            <div className="col-12">
-              <label className="form-label d-block">Available Colours *</label>
-              {colorOptions.map((color) => (
-                <div className="form-check form-check-inline" key={color}>
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id={`color-${color}`}
-                    value={color}
-                    checked={formData.colors.includes(color)}
-                    onChange={(event) => handleCheckboxChange(event, "colors")}
-                  />
-                  <label className="form-check-label" htmlFor={`color-${color}`}>
-                    {color}
-                  </label>
-                </div>
-              ))}
-            </div>
+            {/* Size and Colour-wise Inventory */}
+            <VariantStockManager
+              variants={formData.variants}
+              onChange={handleVariantChange}
+            />
 
+            {/* Product Images */}
             <div className="col-12">
-              <label className="form-label">Product Images * (Maximum 5)</label>
+              <label className="form-label">
+                Product Images * (Maximum 5)
+              </label>
+
               <input
                 id="productImages"
                 type="file"
@@ -333,14 +458,17 @@ function AddProduct({ onProductAdded, onCancel }) {
                 multiple
                 onChange={handleImageChange}
               />
+
               <small className="text-secondary">
                 JPG, PNG or WEBP. Maximum 5 MB per image.
               </small>
 
+              {/* Image Preview */}
               {images.length > 0 && (
                 <div className="mt-3 d-flex flex-wrap gap-3">
                   {images.map((image, index) => (
                     <div key={`${image.name}-${index}`}>
+
                       <img
                         src={URL.createObjectURL(image)}
                         alt={image.name}
@@ -348,10 +476,20 @@ function AddProduct({ onProductAdded, onCancel }) {
                         height="90"
                         className="rounded border"
                         style={{ objectFit: "cover" }}
+                        onLoad={(event) =>
+                          URL.revokeObjectURL(
+                            event.currentTarget.src
+                          )
+                        }
                       />
-                      <small className="d-block text-truncate" style={{maxWidth: "90px"}}>
+
+                      <small
+                        className="d-block text-truncate"
+                        style={{ maxWidth: "90px" }}
+                      >
                         {image.name}
                       </small>
+
                     </div>
                   ))}
                 </div>
@@ -360,13 +498,16 @@ function AddProduct({ onProductAdded, onCancel }) {
 
           </div>
 
+          {/* Status Message */}
           {message && (
             <div className="alert alert-info mt-3 mb-0">
               {message}
             </div>
           )}
 
+          {/* Form Buttons */}
           <div className="d-flex gap-2 mt-4">
+
             <button
               type="submit"
               className="btn text-white px-4"
@@ -381,10 +522,12 @@ function AddProduct({ onProductAdded, onCancel }) {
                 type="button"
                 className="btn btn-outline-secondary"
                 onClick={onCancel}
+                disabled={loading}
               >
                 Cancel
               </button>
             )}
+
           </div>
         </form>
       </div>

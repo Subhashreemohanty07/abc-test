@@ -41,16 +41,29 @@ const orderItemSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 1,
+      validate: {
+        validator: Number.isSafeInteger,
+        message: "Quantity must be a whole number.",
+      },
     },
 
     size: {
       type: String,
       default: "",
+      trim: true,
     },
 
     color: {
       type: String,
       default: "",
+      trim: true,
+    },
+
+    // INVENTORY TYPE AT THE TIME OF ORDER
+    inventoryType: {
+      type: String,
+      enum: ["variant", "legacy", "unknown"],
+      default: "unknown",
     },
   },
   { _id: true }
@@ -156,6 +169,31 @@ const orderSchema = new mongoose.Schema(
       default: "Placed",
     },
 
+    // INVENTORY RESTORATION STATUS
+    stockRestored: {
+      type: Boolean,
+      default: false,
+    },
+
+    // DATE AND TIME OF STOCK RESTORATION
+    stockRestoredAt: {
+      type: Date,
+      default: null,
+    },
+
+    // ORDER CANCELLATION DATE
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
+
+    // ORDER CANCELLATION REASON
+    cancellationReason: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     // PRICE DETAILS
     subtotal: {
       type: Number,
@@ -177,6 +215,7 @@ const orderSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    optimisticConcurrency: true,
   }
 );
 

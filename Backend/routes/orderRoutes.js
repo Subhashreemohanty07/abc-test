@@ -24,10 +24,281 @@ const allowRoles = (...roles) => (req, res, next) => {
   next();
 };
 
+// CREATE CUSTOM ERROR
+function createError(message, statusCode = 400) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
+
+// NORMALIZE PRODUCT SIZES AND COLOURS
+function normalizeOptions(value) {
+  return [
+    ...new Set(
+      (Array.isArray(value)
+        ? value
+        : String(value || "").split(",")
+      )
+        .map((item) => String(item).trim())
+        .filter(Boolean)
+    ),
+  ];
+}
+
+// CHECK WHETHER PRODUCT HAS VARIANT INVENTORY
+function hasVariantInventory(product) {
+  return (
+    Array.isArray(product.variants) &&
+    product.variants.length > 0
+  );
+}
+
+// VALIDATE SELECTED SIZE AND COLOUR
+function validateSelectedOptions(product, size, color) {
+  const sizes = normalizeOptions(product.sizes);
+  const colors = normalizeOptions(product.colors);
+
+  if (
+    (sizes.length > 0 && !sizes.includes(size)) ||
+    (sizes.length === 0 && size !== "")
+  ) {
+    throw createError(
+      `Selected size is no longer available for ${product.productName}.`
+    );
+  }
+
+  if (
+    (colors.length > 0 && !colors.includes(color)) ||
+    (colors.length === 0 && color !== "")
+  ) {
+    throw createError(
+      `Selected colour is no longer available for ${product.productName}.`
+    );
+  }
+}
+
+// VALIDATE AND DEDUCT INVENTORY
+async function deductInventory(product, item, session) {
+  const quantity = Number(item.quantity);
+  const size = item.size || "";
+  const color = item.color || "";
+
+  if (!Number.isSafeInteger(quantity) || quantity < 1) {
+    throw createError("Invalid cart quantity.");
+  }
+
+  // Validate selected size and colour
+  validateSelectedOptions(product, size, color);
+
+  // VARIANT-BASED INVENTORY
+  if (hasVariantInventory(product)) {
+    const variant = product.variants.find(
+      (variant) =>
+        variant.size === size &&
+        variant.color === color
+    );
+
+    if (!variant) {
+      throw createError(
+        `Selected combination is unavailable for ${product.productName}.`
+      );
+    }
+
+    if (Number(variant.stock) < quantity) {
+      throw createError(
+        `Insufficient stock for ${product.productName} (${size}, ${color}). Only ${variant.stock} item(s) available.`
+      );
+    }
+
+    // Atomically deduct selected variant and total stock
+    const updatedProduct = await Product.findOneAndUpdate(
+      {
+        _id: product._id,
+
+        stock: { $gte: quantity },
+
+        variants: {
+          $elemMatch: {
+            size,
+            color,
+            stock: { $gte: quantity },
+          },
+        },
+      },
+      {
+        $inc: {
+          stock: -quantity,
+          "variants.$.stock": -quantity,
+          __v: 1,
+        },
+      },
+      {
+        returnDocument: "after",
+        session,
+      }
+    );
+
+    if (!updatedProduct) {
+      throw createError(
+        `Insufficient stock for ${product.productName} (${size}, ${color}). Please update your cart.`
+      );
+    }
+
+    return "variant";
+  }
+
+  // LEGACY PRODUCT INVENTORY
+  // Older products without size and colour-wise stock
+  const updatedProduct = await Product.findOneAndUpdate(
+    {
+      _id: product._id,
+
+      stock: { $gte: quantity },
+
+      "variants.0": { $exists: false },
+    },
+    {
+      $inc: {
+        stock: -quantity,
+        __v: 1,
+      },
+    },
+    {
+      returnDocument: "after",
+      session,
+    }
+  );
+
+  if (!updatedProduct) {
+    throw createError(
+      `Insufficient stock for ${product.productName}.`
+    );
+  }
+
+  return "legacy";
+}
+
+
+// RESTORE INVENTORY AFTER ORDER CANCELLATION
+async function restoreInventory(item, session) {
+  const quantity = Number(item.quantity);
+  const size = item.size || "";
+  const color = item.color || "";
+
+  if (!Number.isSafeInteger(quantity) || quantity < 1) {
+    throw createError("Invalid order quantity.");
+  }
+
+  const product = await Product.findById(
+    item.product
+  ).session(session);
+
+  if (!product) {
+    throw createError(
+      `Product ${item.productName} no longer exists.`,
+      409
+    );
+  }
+
+  // RESTORE VARIANT INVENTORY
+  if (item.inventoryType === "variant") {
+    const variant = product.variants?.find(
+      (variant) =>
+        variant.size === size &&
+        variant.color === color
+    );
+
+    if (!variant) {
+      throw createError(
+        `Original variant of ${item.productName} is no longer available.`,
+        409
+      );
+    }
+
+    const updatedProduct = await Product.findOneAndUpdate(
+      {
+        _id: product._id,
+        variants: {
+          $elemMatch: {
+            size,
+            color,
+          },
+        },
+      },
+      {
+        $inc: {
+          stock: quantity,
+          "variants.$.stock": quantity,
+          __v: 1,
+        },
+      },
+      {
+        returnDocument: "after",
+        session,
+      }
+    );
+
+    if (!updatedProduct) {
+      throw createError(
+        `Unable to restore stock for ${item.productName}.`,
+        409
+      );
+    }
+
+    return;
+  }
+
+  // RESTORE LEGACY INVENTORY
+  if (item.inventoryType === "legacy") {
+    if (hasVariantInventory(product)) {
+      throw createError(
+        `${item.productName} has been migrated to variant inventory. Manual stock reconciliation is required.`,
+        409
+      );
+    }
+
+    const updatedProduct = await Product.findOneAndUpdate(
+      {
+        _id: product._id,
+        "variants.0": { $exists: false },
+      },
+      {
+        $inc: {
+          stock: quantity,
+          __v: 1,
+        },
+      },
+      {
+        returnDocument: "after",
+        session,
+      }
+    );
+
+    if (!updatedProduct) {
+      throw createError(
+        `Unable to restore stock for ${item.productName}.`,
+        409
+      );
+    }
+
+    return;
+  }
+
+  // OLD ORDERS WITH UNKNOWN INVENTORY TYPE
+  throw createError(
+    `Inventory history is unavailable for ${item.productName}. Please contact support.`,
+    409
+  );
+}
+
+
 // POST /api/orders
 // CUSTOMER PLACES AN ORDER
 router.post("/", allowRoles("customer"), async (req, res) => {
-  const { addressId, paymentMethod = "COD" } = req.body;
+  const {
+    addressId,
+    paymentMethod = "COD",
+  } = req.body;
 
   if (!mongoose.isValidObjectId(addressId)) {
     return res.status(400).json({
@@ -41,87 +312,89 @@ router.post("/", allowRoles("customer"), async (req, res) => {
     });
   }
 
-  const session = await mongoose.startSession();
+  let session;
 
   try {
+    session = await mongoose.startSession();
+
     let createdOrder;
 
     await session.withTransaction(async () => {
       const userId = req.user.userId;
 
-      // Verify the address belongs to the customer
+      // VERIFY DELIVERY ADDRESS
       const address = await Address.findOne({
         _id: addressId,
         user: userId,
       }).session(session);
 
       if (!address) {
-        const error = new Error("Delivery address not found.");
-        error.statusCode = 404;
-        throw error;
+        throw createError(
+          "Delivery address not found.",
+          404
+        );
       }
 
-      // Get cart from MongoDB
-      const cart = await Cart.findOne({ user: userId })
-        .session(session);
+      // GET CUSTOMER CART
+      const cart = await Cart.findOne({
+        user: userId,
+      }).session(session);
 
       if (!cart || cart.items.length === 0) {
-        const error = new Error("Your cart is empty.");
-        error.statusCode = 400;
-        throw error;
+        throw createError("Your cart is empty.");
       }
 
       const orderItems = [];
       let subtotal = 0;
 
+      // VALIDATE EACH CART ITEM
       for (const item of cart.items) {
-        if (!Number.isInteger(item.quantity) || item.quantity < 1) {
-          const error = new Error("Invalid cart quantity.");
-          error.statusCode = 400;
-          throw error;
+        const quantity = Number(item.quantity);
+
+        if (
+          !Number.isSafeInteger(quantity) ||
+          quantity < 1
+        ) {
+          throw createError("Invalid cart quantity.");
         }
 
-        // Read current product details
-        const product = await Product.findById(item.product)
-          .session(session);
+        // FETCH LATEST PRODUCT DETAILS
+        const product = await Product.findById(
+          item.product
+        ).session(session);
 
         if (!product) {
-          const error = new Error(
+          throw createError(
             "A product in your cart is no longer available."
           );
-          error.statusCode = 400;
-          throw error;
         }
 
-        // Atomically reduce stock only if enough is available
-        const updatedProduct = await Product.findOneAndUpdate(
-          {
-            _id: product._id,
-            stock: { $gte: item.quantity },
-          },
-          {
-            $inc: { stock: -item.quantity },
-          },
-          {
-            new: true,
-            session,
-          }
-        );
-
-        if (!updatedProduct) {
-          const error = new Error(
-            `Insufficient stock for ${product.productName}.`
-          );
-          error.statusCode = 400;
-          throw error;
-        }
-
+        // GET CURRENT PRODUCT PRICE
         const price = Number(
           product.discountPrice ?? product.price
         );
 
-        subtotal += price * item.quantity;
+        if (!Number.isFinite(price) || price < 0) {
+          throw createError(
+            `Invalid price for ${product.productName}.`
+          );
+        }
 
+        // VALIDATE AND DEDUCT STOCK
+        const inventoryType = await deductInventory(
+          product,
+          item,
+          session
+        );
+
+        // CALCULATE SUBTOTAL
+        subtotal += price * quantity;
+
+        if (!Number.isFinite(subtotal)) {
+          throw createError("Invalid order amount.");
+        }
+
+        // SAVE PRODUCT SNAPSHOT
         orderItems.push({
           product: product._id,
           vendor: product.createdBy,
@@ -129,13 +402,14 @@ router.post("/", allowRoles("customer"), async (req, res) => {
           brand: product.brand,
           image: product.images?.[0]?.url || "",
           price,
-          quantity: item.quantity,
+          quantity,
           size: item.size || "",
           color: item.color || "",
+          inventoryType,
         });
       }
 
-      // Snapshot of selected delivery address
+      // DELIVERY ADDRESS SNAPSHOT
       const deliveryAddress = {
         addressType: address.addressType,
         fullName: address.fullName,
@@ -149,15 +423,23 @@ router.post("/", allowRoles("customer"), async (req, res) => {
 
       const deliveryCharge = 0;
 
+      // CREATE ORDER
       const orders = await Order.create(
         [
           {
             user: userId,
             items: orderItems,
             deliveryAddress,
+
             paymentMethod: "COD",
             paymentStatus: "Pending",
             orderStatus: "Placed",
+
+            stockRestored: false,
+            stockRestoredAt: null,
+            cancelledAt: null,
+            cancellationReason: "",
+
             subtotal,
             deliveryCharge,
             totalAmount: subtotal + deliveryCharge,
@@ -168,29 +450,38 @@ router.post("/", allowRoles("customer"), async (req, res) => {
 
       createdOrder = orders[0];
 
-      // Empty cart only after creating the order
-      await Cart.updateOne(
-        { _id: cart._id },
-        { $set: { items: [] } },
-        { session }
-      );
+      // EMPTY CART AFTER SUCCESSFUL ORDER CREATION
+      cart.items = [];
+
+      await cart.save({ session });
     });
 
+    // TRANSACTION SUCCESSFUL
     return res.status(201).json({
       message: "Order placed successfully.",
       order: createdOrder,
     });
+
   } catch (error) {
     console.error("Place order error:", error);
 
+    if (error.name === "VersionError") {
+      return res.status(409).json({
+        message:
+          "Your cart has changed. Please refresh and try again.",
+      });
+    }
+
     return res.status(error.statusCode || 500).json({
-      message:
-        error.statusCode
-          ? error.message
-          : "Unable to place order. Please try again.",
+      message: error.statusCode
+        ? error.message
+        : "Unable to place order. Please check your orders before trying again.",
     });
+
   } finally {
-    await session.endSession();
+    if (session) {
+      await session.endSession();
+    }
   }
 });
 
@@ -203,8 +494,10 @@ router.get("/my", allowRoles("customer"), async (req, res) => {
     }).sort({ createdAt: -1 });
 
     return res.json({ orders });
+
   } catch (error) {
     console.error("Customer orders error:", error);
+
     return res.status(500).json({
       message: "Unable to fetch your orders.",
     });
@@ -215,7 +508,7 @@ router.get("/my", allowRoles("customer"), async (req, res) => {
 // VENDOR SEES THEIR PRODUCTS AND CUSTOMER DETAILS
 router.get("/vendor", allowRoles("vendor"), async (req, res) => {
   try {
-    const vendorId = req.user.userId;
+    const vendorId = String(req.user.userId);
 
     const orders = await Order.find({
       "items.vendor": vendorId,
@@ -231,12 +524,14 @@ router.get("/vendor", allowRoles("vendor"), async (req, res) => {
       );
 
       const vendorSubtotal = vendorItems.reduce(
-        (total, item) => total + item.price * item.quantity,
+        (total, item) =>
+          total + item.price * item.quantity,
         0
       );
 
       return {
         _id: order._id,
+
         customer: order.user
           ? {
               _id: order.user._id,
@@ -244,19 +539,29 @@ router.get("/vendor", allowRoles("vendor"), async (req, res) => {
               email: order.user.email,
             }
           : null,
+
         deliveryAddress: order.deliveryAddress,
         items: vendorItems,
         subtotal: vendorSubtotal,
+
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
         orderStatus: order.orderStatus,
+
+        cancelledAt: order.cancelledAt,
+        cancellationReason: order.cancellationReason,
+
         createdAt: order.createdAt,
       };
     });
 
-    return res.json({ orders: vendorOrders });
+    return res.json({
+      orders: vendorOrders,
+    });
+
   } catch (error) {
     console.error("Vendor orders error:", error);
+
     return res.status(500).json({
       message: "Unable to fetch vendor orders.",
     });
@@ -273,8 +578,10 @@ router.get("/admin", allowRoles("admin"), async (req, res) => {
       .sort({ createdAt: -1 });
 
     return res.json({ orders });
+
   } catch (error) {
     console.error("Admin orders error:", error);
+
     return res.status(500).json({
       message: "Unable to fetch orders.",
     });
@@ -304,8 +611,13 @@ router.get(
         .sort({ createdAt: -1 });
 
       return res.json({ orders });
+
     } catch (error) {
-      console.error("Admin customer orders error:", error);
+      console.error(
+        "Admin customer orders error:",
+        error
+      );
+
       return res.status(500).json({
         message: "Unable to fetch customer orders.",
       });
@@ -313,9 +625,8 @@ router.get(
   }
 );
 
- // GET /api/orders/:orderId/receipt
- // DOWNLOAD RECEIPT FOR CUSTOMER'S OWN ORDER
-
+// GET /api/orders/:orderId/receipt
+// DOWNLOAD CUSTOMER ORDER RECEIPT
 router.get(
   "/:orderId/receipt",
   allowRoles("customer"),
@@ -323,14 +634,14 @@ router.get(
     try {
       const { orderId } = req.params;
 
-      // Validate order ID
+      // VALIDATE ORDER ID
       if (!mongoose.isValidObjectId(orderId)) {
         return res.status(400).json({
           message: "Invalid order ID.",
         });
       }
 
-      // Find only this customer's order
+      // FIND CUSTOMER'S OWN ORDER
       const order = await Order.findOne({
         _id: orderId,
         user: req.user.userId,
@@ -342,13 +653,17 @@ router.get(
         });
       }
 
-      // Create PDF
+      // CREATE PDF
       const doc = new PDFDocument({
         size: "A4",
         margin: 50,
       });
 
-      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Type",
+        "application/pdf"
+      );
+
       res.setHeader(
         "Content-Disposition",
         `attachment; filename="Nykaa-Receipt-${order._id}.pdf"`
@@ -360,12 +675,16 @@ router.get(
       doc
         .fontSize(24)
         .fillColor("#fc2779")
-        .text("NYKAA CLONE", { align: "center" });
+        .text("NYKAA CLONE", {
+          align: "center",
+        });
 
       doc
         .fontSize(15)
         .fillColor("#333333")
-        .text("ORDER RECEIPT", { align: "center" });
+        .text("ORDER RECEIPT", {
+          align: "center",
+        });
 
       doc.moveDown(2);
 
@@ -373,12 +692,24 @@ router.get(
       doc.fontSize(11).fillColor("#000000");
 
       doc.text(`Order ID: ${order._id}`);
+
       doc.text(
-        `Order Date: ${new Date(order.createdAt).toLocaleString("en-IN")}`
+        `Order Date: ${new Date(
+          order.createdAt
+        ).toLocaleString("en-IN")}`
       );
-      doc.text(`Order Status: ${order.orderStatus}`);
-      doc.text(`Payment Method: ${order.paymentMethod}`);
-      doc.text(`Payment Status: ${order.paymentStatus}`);
+
+      doc.text(
+        `Order Status: ${order.orderStatus}`
+      );
+
+      doc.text(
+        `Payment Method: ${order.paymentMethod}`
+      );
+
+      doc.text(
+        `Payment Status: ${order.paymentStatus}`
+      );
 
       doc.moveDown(1.5);
 
@@ -386,11 +717,17 @@ router.get(
       const address = order.deliveryAddress || {};
 
       doc.fontSize(14).text("Delivery Address");
+
       doc.moveDown(0.5);
       doc.fontSize(11);
 
-      doc.text(`Name: ${address.fullName || ""}`);
-      doc.text(`Phone: ${address.phone || ""}`);
+      doc.text(
+        `Name: ${address.fullName || ""}`
+      );
+
+      doc.text(
+        `Phone: ${address.phone || ""}`
+      );
 
       doc.text(
         [
@@ -403,7 +740,9 @@ router.get(
           .join(", ")
       );
 
-      doc.text(`Pincode: ${address.pincode || ""}`);
+      doc.text(
+        `Pincode: ${address.pincode || ""}`
+      );
 
       doc.moveDown(1.5);
 
@@ -417,13 +756,15 @@ router.get(
 
         doc.fontSize(11).fillColor("#000000");
 
-        doc.text(`Product: ${item.productName || "Product"}`);
-        doc.text(`Brand: ${item.brand || "N/A"}`);
-        doc.text(`Quantity: ${quantity}`);
-        doc.text(`Unit Price: Rs. ${price.toFixed(2)}`);
         doc.text(
-          `Item Total: Rs. ${(price * quantity).toFixed(2)}`
+          `Product: ${item.productName || "Product"}`
         );
+
+        doc.text(
+          `Brand: ${item.brand || "N/A"}`
+        );
+
+        doc.text(`Quantity: ${quantity}`);
 
         if (item.size) {
           doc.text(`Size: ${item.size}`);
@@ -433,20 +774,37 @@ router.get(
           doc.text(`Colour: ${item.color}`);
         }
 
+        doc.text(
+          `Unit Price: Rs. ${price.toFixed(2)}`
+        );
+
+        doc.text(
+          `Item Total: Rs. ${(
+            price * quantity
+          ).toFixed(2)}`
+        );
+
         doc.moveDown();
       }
 
       // PAYMENT SUMMARY
       doc.moveDown();
+
       doc.fontSize(14).text("Payment Summary");
       doc.moveDown(0.5);
 
       doc.fontSize(11);
+
       doc.text(
-        `Subtotal: Rs. ${Number(order.subtotal || 0).toFixed(2)}`
+        `Subtotal: Rs. ${Number(
+          order.subtotal || 0
+        ).toFixed(2)}`
       );
+
       doc.text(
-        `Delivery Charge: Rs. ${Number(order.deliveryCharge || 0).toFixed(2)}`
+        `Delivery Charge: Rs. ${Number(
+          order.deliveryCharge || 0
+        ).toFixed(2)}`
       );
 
       doc.moveDown(0.5);
@@ -455,7 +813,9 @@ router.get(
         .fontSize(15)
         .fillColor("#fc2779")
         .text(
-          `Total Amount: Rs. ${Number(order.totalAmount || 0).toFixed(2)}`
+          `Total Amount: Rs. ${Number(
+            order.totalAmount || 0
+          ).toFixed(2)}`
         );
 
       doc.moveDown(2);
@@ -473,11 +833,14 @@ router.get(
         { align: "center" }
       );
 
-      // Finish PDF
+      // FINISH PDF
       doc.end();
 
     } catch (error) {
-      console.error("Receipt generation error:", error);
+      console.error(
+        "Receipt generation error:",
+        error
+      );
 
       if (!res.headersSent) {
         return res.status(500).json({
@@ -486,6 +849,171 @@ router.get(
       }
 
       res.destroy(error);
+    }
+  }
+);
+
+
+// PATCH /api/orders/:orderId/cancel
+// CUSTOMER CANCELS THEIR OWN ORDER
+
+router.patch(
+  "/:orderId/cancel",
+  allowRoles("customer"),
+  async (req, res) => {
+    const { orderId } = req.params;
+    const { reason = "" } = req.body || {};
+
+    // VALIDATE ORDER ID
+    if (!mongoose.isValidObjectId(orderId)) {
+      return res.status(400).json({
+        message: "Invalid order ID.",
+      });
+    }
+
+    // VALIDATE CANCELLATION REASON
+    if (
+      typeof reason !== "string" ||
+      reason.trim().length > 500
+    ) {
+      return res.status(400).json({
+        message: "Invalid cancellation reason.",
+      });
+    }
+
+    let session;
+
+    try {
+      session = await mongoose.startSession();
+
+      let cancelledOrder;
+
+      await session.withTransaction(async () => {
+        const userId = req.user.userId;
+
+        // FIND CUSTOMER'S OWN ORDER
+        const order = await Order.findOne({
+          _id: orderId,
+          user: userId,
+        }).session(session);
+
+        if (!order) {
+          throw createError(
+            "Order not found.",
+            404
+          );
+        }
+
+        // PREVENT DUPLICATE CANCELLATION
+        if (
+          order.orderStatus === "Cancelled" ||
+          order.stockRestored
+        ) {
+          throw createError(
+            "This order has already been cancelled or its stock restored.",
+            409
+          );
+        }
+
+        // CHECK CANCELLATION ELIGIBILITY
+        const cancellableStatuses = [
+          "Placed",
+          "Confirmed",
+        ];
+
+        if (
+          !cancellableStatuses.includes(
+            order.orderStatus
+          )
+        ) {
+          throw createError(
+            `An order with status ${order.orderStatus} cannot be cancelled.`,
+            409
+          );
+        }
+
+        // PAID ORDERS REQUIRE REFUND HANDLING
+        if (order.paymentStatus !== "Pending") {
+          throw createError(
+            "This order requires payment verification before cancellation. Please contact support.",
+            409
+          );
+        }
+
+        const cancelledAt = new Date();
+
+        // ATOMICALLY CLAIM ORDER CANCELLATION
+        cancelledOrder = await Order.findOneAndUpdate(
+          {
+            _id: order._id,
+            user: userId,
+
+            orderStatus: {
+              $in: ["Placed", "Confirmed"],
+            },
+
+            paymentStatus: "Pending",
+
+            stockRestored: {
+              $ne: true,
+            },
+          },
+          {
+            $set: {
+              orderStatus: "Cancelled",
+              stockRestored: true,
+              stockRestoredAt: cancelledAt,
+              cancelledAt,
+              cancellationReason: reason.trim(),
+            },
+
+            $inc: {
+              __v: 1,
+            },
+          },
+          {
+            returnDocument: "after",
+            session,
+            runValidators: true,
+          }
+        );
+
+        if (!cancelledOrder) {
+          throw createError(
+            "Order status has changed. Please refresh and try again.",
+            409
+          );
+        }
+
+        // RESTORE EACH ORDER ITEM'S INVENTORY
+        for (const item of order.items) {
+          await restoreInventory(item, session);
+        }
+      });
+
+      return res.status(200).json({
+        message: "Order cancelled successfully.",
+        order: cancelledOrder,
+      });
+
+    } catch (error) {
+      console.error(
+        "Cancel order error:",
+        error
+      );
+
+      return res.status(
+        error.statusCode || 500
+      ).json({
+        message: error.statusCode
+          ? error.message
+          : "Unable to confirm cancellation. Please check your order status before trying again.",
+      });
+
+    } finally {
+      if (session) {
+        await session.endSession();
+      }
     }
   }
 );

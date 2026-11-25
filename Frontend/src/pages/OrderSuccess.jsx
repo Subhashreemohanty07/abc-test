@@ -106,7 +106,7 @@ function OrderSuccess() {
 
               <p className="text-secondary">
                 Thank you for shopping with us.
-                Your order has been confirmed.
+                Your order has been placed successfully.
               </p>
 
               {/* ORDER DETAILS */}

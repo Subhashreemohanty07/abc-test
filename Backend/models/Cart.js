@@ -10,18 +10,25 @@ const cartItemSchema = new mongoose.Schema({
 
   quantity: {
     type: Number,
+    required: true,
     default: 1,
     min: 1,
+    validate: {
+      validator: Number.isSafeInteger,
+      message: "Quantity must be a whole number.",
+    },
   },
 
   size: {
     type: String,
     default: "",
+    trim: true,
   },
 
   color: {
     type: String,
     default: "",
+    trim: true,
   },
 });
 
@@ -36,7 +43,10 @@ const cartSchema = new mongoose.Schema(
 
     items: [cartItemSchema],
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    optimisticConcurrency: true,
+  }
 );
 
 export default mongoose.model("Cart", cartSchema);

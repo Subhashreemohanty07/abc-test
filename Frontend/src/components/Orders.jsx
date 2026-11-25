@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import {useRef, useState } from "react";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -15,6 +15,32 @@ function Orders({
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [downloadingOrderId, setDownloadingOrderId] = useState(null);
   const [downloadError, setDownloadError] = useState("");
+  // ORDER CANCELLATION
+const [cancelOrderId, setCancelOrderId] = useState(null);
+const [cancelReason, setCancelReason] = useState("");
+const [otherReason, setOtherReason] = useState("");
+const [cancellingOrderId, setCancellingOrderId] = useState(null);
+
+const [cancelError, setCancelError] = useState("");
+const [cancelSuccess, setCancelSuccess] = useState("");
+
+// STORE UPDATED ORDERS AFTER CANCELLATION
+const [updatedOrders, setUpdatedOrders] = useState({});
+
+// PREVENT DUPLICATE CANCELLATION
+const cancellationInProgress = useRef(false);
+
+// CUSTOMER ROLE CHECK
+const isCustomer = !isAdmin && !isVendor;
+
+const cancellationReasons = [
+  "Ordered by mistake",
+  "Changed my mind",
+  "Found a better price",
+  "Delivery taking too long",
+  "Ordered wrong size or colour",
+  "Other",
+];
 
   // EXPAND / COLLAPSE ORDER DETAILS
   const toggleOrderDetails = (orderId) => {
@@ -36,17 +62,220 @@ function Orders({
     (item) => item._id === activeCustomerId
   );
 
-  // ADMIN ORDER FILTER
-  const visibleOrders = isAdmin
-    ? orders.filter((order) => {
-        const customerId =
-          typeof order.user === "object"
-            ? order.user?._id
-            : order.user;
+ 
+// MERGE UPDATED ORDERS WITH EXISTING ORDERS
+const currentOrders = orders.map((order) =>
+  isCustomer
+    ? updatedOrders[order._id] || order
+    : order
+);
 
-        return customerId === activeCustomerId;
-      })
-    : orders;
+// ADMIN ORDER FILTER
+const visibleOrders = isAdmin
+  ? currentOrders.filter((order) => {
+      const customerId =
+        typeof order.user === "object"
+          ? order.user?._id
+          : order.user;
+
+      return customerId === activeCustomerId;
+    })
+  : currentOrders;
+
+
+// CHECK WHETHER ORDER CAN BE CANCELLED
+function canCancelOrder(order) {
+  return (
+    isCustomer &&
+    ["Placed", "Confirmed"].includes(order.orderStatus) &&
+    order.paymentStatus === "Pending" &&
+    order.stockRestored !== true
+  );
+}
+
+// OPEN CANCELLATION FORM
+function openCancellation(order) {
+  if (
+    !canCancelOrder(order) ||
+    cancellationInProgress.current
+  ) {
+    return;
+  }
+
+  setCancelOrderId(order._id);
+  setCancelReason("");
+  setOtherReason("");
+  setCancelError("");
+  setCancelSuccess("");
+}
+
+// CLOSE CANCELLATION FORM
+function closeCancellation() {
+  if (cancellationInProgress.current) return;
+
+  setCancelOrderId(null);
+  setCancelReason("");
+  setOtherReason("");
+  setCancelError("");
+}
+
+// CANCEL ORDER API
+async function handleCancelOrder(order) {
+  if (
+    !canCancelOrder(order) ||
+    cancellationInProgress.current ||
+    cancelOrderId !== order._id
+  ) {
+    return;
+  }
+
+  setCancelError("");
+  setCancelSuccess("");
+
+  // VALIDATE CANCELLATION REASON
+  const finalReason =
+    cancelReason === "Other"
+      ? otherReason.trim()
+      : cancelReason.trim();
+
+  if (!finalReason) {
+    setCancelError(
+      "Please provide a cancellation reason."
+    );
+    return;
+  }
+
+  if (finalReason.length > 500) {
+    setCancelError(
+      "Cancellation reason cannot exceed 500 characters."
+    );
+    return;
+  }
+
+  // CHECK LOGIN
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    setCancelError(
+      "Please sign in to cancel your order."
+    );
+    return;
+  }
+
+  // CONFIRM CANCELLATION
+  const confirmed = window.confirm(
+    "Are you sure you want to cancel this order?\n\n" +
+    "All products in this order will be cancelled.\n\n" +
+    "This action cannot be undone."
+  );
+
+  if (!confirmed) return;
+
+  // PREVENT MULTIPLE REQUESTS
+  cancellationInProgress.current = true;
+  setCancellingOrderId(order._id);
+
+  try {
+    const response = await fetch(
+      `${API_URL}/api/orders/${order._id}/cancel`,
+      {
+        method: "PATCH",
+
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+
+        body: JSON.stringify({
+          reason: finalReason,
+        }),
+      }
+    );
+
+    const data = await response.json().catch(() => ({}));
+
+    // HANDLE EXPIRED LOGIN
+    if (response.status === 401) {
+      throw new Error(
+        "Your session has expired. Please sign in again."
+      );
+    }
+
+    // HANDLE API ERRORS
+    if (!response.ok) {
+      throw new Error(
+        data.message || "Unable to cancel order."
+      );
+    }
+
+    // VERIFY RESPONSE
+    if (
+      !data.order?._id ||
+      String(data.order._id) !== String(order._id) ||
+      data.order.orderStatus !== "Cancelled"
+    ) {
+      throw new Error(
+        "Unable to verify cancellation. Please refresh your order history."
+      );
+    }
+
+    // UPDATE ORDER IN UI
+    setUpdatedOrders((previousOrders) => ({
+      ...previousOrders,
+
+      [order._id]: {
+        ...order,
+        ...data.order,
+      },
+    }));
+
+    // SUCCESS MESSAGE
+    setCancelSuccess(
+      data.message || "Order cancelled successfully."
+    );
+
+    // RESET CANCELLATION FORM
+    setCancelOrderId(null);
+    setCancelReason("");
+    setOtherReason("");
+
+  } catch (error) {
+    console.error("Order cancellation error:", error);
+
+    setCancelError(
+      error.message ||
+      "Unable to confirm cancellation. Please refresh your orders."
+    );
+
+  } finally {
+    cancellationInProgress.current = false;
+    setCancellingOrderId(null);
+  }
+}
+
+// ORDER STATUS BADGE COLOUR
+function getOrderStatusClass(status) {
+  switch (status) {
+    case "Placed":
+      return "bg-primary text-white";
+
+    case "Confirmed":
+      return "bg-info text-dark";
+
+    case "Shipped":
+      return "bg-warning text-dark";
+
+    case "Delivered":
+      return "bg-success text-white";
+
+    case "Cancelled":
+      return "bg-danger text-white";
+
+    default:
+      return "bg-light text-dark border";
+  }
+}
+
 
   // CUSTOMER PDF DOWNLOAD
   async function handleDownloadReceipt(orderId) {
@@ -194,6 +423,21 @@ function Orders({
             {downloadError}
           </div>
         )}
+        {/* CANCELLATION SUCCESS MESSAGE */}
+        {isCustomer && cancelSuccess && (
+          <div className="alert alert-success" role="alert">
+            <i className="bi bi-check-circle-fill me-2"></i>
+            {cancelSuccess}
+          </div>
+        )}
+
+        {/* CANCELLATION ERROR MESSAGE */}
+        {isCustomer && cancelError && (
+          <div className="alert alert-danger" role="alert">
+            <i className="bi bi-exclamation-circle me-2"></i>
+            {cancelError}
+          </div>
+        )}
 
         {/* ORDER CONTENT */}
         {isAdmin && !activeCustomerId ? (
@@ -237,7 +481,13 @@ function Orders({
                     Order #{order.orderNumber || order._id}
                   </h6>
 
-                  <span className="badge bg-light text-dark border">
+                  <span
+                    className={`badge ${getOrderStatusClass(
+                      order.orderStatus ||
+                      order.status ||
+                      "Pending"
+                    )}`}
+                  >
                     {order.orderStatus ||
                       order.status ||
                       "Pending"}
@@ -287,6 +537,27 @@ function Orders({
                         }`}
                       ></i>
                     </button>
+                    {/* CANCEL ORDER - CUSTOMER ONLY */}
+                    {canCancelOrder(order) && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-danger"
+                        onClick={() => openCancellation(order)}
+                        disabled={cancellingOrderId !== null}
+                      >
+                        {cancellingOrderId === order._id ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-2"></span>
+                            Cancelling...
+                          </>
+                        ) : (
+                          <>
+                            <i className="bi bi-x-circle me-2"></i>
+                            Cancel Order
+                          </>
+                        )}
+                      </button>
+                    )}
 
                     {/* CUSTOMER PDF DOWNLOAD ONLY */}
                     {!isAdmin && !isVendor && (
@@ -320,6 +591,151 @@ function Orders({
                   {" | "}
                   {order.paymentStatus || "Pending"}
                 </p>
+
+                {/* CANCELLATION FORM - CUSTOMER ONLY */}
+                {isCustomer &&
+                  cancelOrderId === order._id &&
+                  canCancelOrder(order) && (
+                      <div
+                        className="border rounded-3 p-3 mt-3"
+                        style={{
+                          backgroundColor: "#fff7fa",
+                          borderColor: "#fc2779",
+                        }}
+                      >
+                        <h6 className="fw-bold text-danger mb-2">
+                          Cancel Order
+                        </h6>
+
+                        <p className="small text-secondary">
+                          Please select the reason for cancelling
+                          your order.
+                        </p>
+
+                        <label
+                          className="form-label fw-semibold small"
+                          htmlFor={`cancel-reason-${order._id}`}
+                        >
+                          Cancellation Reason *
+                        </label>
+
+                        <select
+                          id={`cancel-reason-${order._id}`}
+                          className="form-select mb-3"
+                          value={cancelReason}
+                          disabled={cancellingOrderId !== null}
+                          onChange={(e) => {
+                            setCancelReason(e.target.value);
+                            setOtherReason("");
+                            setCancelError("");
+                          }}
+                        >
+                          <option value="">
+                            Select cancellation reason
+                          </option>
+
+                          {cancellationReasons.map((reason) => (
+                            <option key={reason} value={reason}>
+                              {reason}
+                            </option>
+                          ))}
+                        </select>
+
+                        {/* OTHER REASON */}
+                        {cancelReason === "Other" && (
+                          <div className="mb-3">
+                            <label className="form-label small fw-semibold">
+                              Please specify your reason
+                            </label>
+
+                            <textarea
+                              className="form-control"
+                              rows={3}
+                              maxLength={500}
+                              value={otherReason}
+                              disabled={cancellingOrderId !== null}
+                              placeholder="Enter your cancellation reason..."
+                              onChange={(e) => {
+                                setOtherReason(e.target.value);
+                                setCancelError("");
+                              }}
+                            />
+
+                            <p className="small text-secondary text-end mt-1">
+                              {otherReason.length}/500
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="alert alert-warning small">
+                          <i className="bi bi-exclamation-triangle me-2"></i>
+
+                          Cancelling this order will cancel all
+                          products included in the order.
+                        </div>
+
+                        <div className="d-flex flex-wrap gap-2">
+
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={closeCancellation}
+                            disabled={cancellingOrderId !== null}
+                          >
+                            Keep Order
+                          </button>
+
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-danger"
+                            onClick={() => handleCancelOrder(order)}
+                            disabled={
+                              cancellingOrderId !== null ||
+                              !cancelReason ||
+                              (
+                                cancelReason === "Other" &&
+                                !otherReason.trim()
+                              )
+                            }
+                          >
+                            {cancellingOrderId === order._id ? (
+                              <>
+                                <span className="spinner-border spinner-border-sm me-2"></span>
+                                Cancelling...
+                              </>
+                            ) : (
+                              "Confirm Cancellation"
+                            )}
+                          </button>
+
+                        </div>
+                      </div>
+                )}
+
+                {/* CANCELLED ORDER INFORMATION - ALL ROLES */}
+                {order.orderStatus === "Cancelled" && (
+                  <div className="bg-light border rounded-3 p-3 mt-3">
+
+                    <h6 className="text-danger fw-bold small">
+                      <i className="bi bi-x-circle-fill me-2"></i>
+                      Order Cancelled
+                    </h6>
+
+                    <p className="small mb-1">
+                      <strong>Cancellation Reason:</strong>{" "}
+                      {order.cancellationReason || "Not provided"}
+                    </p>
+
+                    <p className="small mb-0">
+                      <strong>Cancelled On:</strong>{" "}
+                      {order.cancelledAt
+                        ? new Date(order.cancelledAt).toLocaleString("en-IN")
+                        : "N/A"}
+                    </p>
+
+                  </div>
+                )}
+
 
                 {/* EXPANDABLE DETAILS - ALL ROLES */}
                 {expandedOrderId === order._id && (
