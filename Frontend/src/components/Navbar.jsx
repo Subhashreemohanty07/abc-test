@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import NotificationBell from "./NotificationBell";
+import sabkooLogo from "../assets/branding/sabkoo-logo.png";
+
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -461,7 +463,15 @@ function Navbar() {
             className="nykaa-logo"
             onClick={closeMenu}
           >
-            nykaa
+            <img
+              src={sabkooLogo}
+              alt="Sabkoo"
+              style={{
+                width: "150px",
+                height: "auto",
+                objectFit: "contain"
+              }}
+            />
           </Link>
 
           {/* DESKTOP LINKS */}
@@ -534,7 +544,7 @@ function Navbar() {
 
             <input
               type="search"
-              placeholder="Search on Nykaa"
+              placeholder="Search on Sabkoo"
               value={search}
               onChange={(e) =>
                 setSearch(e.target.value)
@@ -610,7 +620,6 @@ function Navbar() {
             >
               <i
                 className="bi bi-heart cart-icon"
-                style={{ fontSize: "23px" }}
               ></i>
 
               <span className="cart-count">
@@ -678,7 +687,7 @@ function Navbar() {
             >
               <input
                 type="search"
-                placeholder="Search on Nykaa"
+                placeholder="Search on Sabkoo"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -753,10 +762,7 @@ function Navbar() {
               onClick={handleWishlist}
               className="text-start"
             >
-              <i
-                className="bi bi-heart me-2"
-                style={{ color: "#fc2779" }}
-              ></i>
+              <i className="bi bi-heart me-2"></i>
               My Wishlist ({wishlistCount})
             </button>
 

@@ -250,16 +250,18 @@ function NotificationBell({ onNavigate }) {
             onClick={() =>
               handleNotificationClick(notification)
             }
-            className={`btn rounded-0 w-100 d-flex gap-3 p-3 border-0 border-bottom text-start ${
-              notification.isRead
-                ? "bg-white"
-                : "bg-danger-subtle"
-            }`}
+            className="btn rounded-0 w-100 d-flex gap-3 p-3 border-0 border-bottom text-start"
+            style={{
+              backgroundColor: notification.isRead
+                ? "#FFFFFF"
+                : "#EEF8F7",
+            }}
           >
             <i
               className={`bi ${
                 icons[notification.type] || "bi-bell"
-              } text-danger fs-5 flex-shrink-0`}
+              } fs-5 flex-shrink-0`}
+              style={{ color: "#087F80" }}
             />
 
             <div className="flex-grow-1 overflow-hidden">
@@ -277,7 +279,7 @@ function NotificationBell({ onNavigate }) {
                     width: "8px",
                     height: "8px",
                     minWidth: "8px",
-                    backgroundColor: "#fc2779",
+                    backgroundColor: "#087F80",
                     display: "inline-block",
                     marginTop: "5px",
                     }}
@@ -307,7 +309,8 @@ function NotificationBell({ onNavigate }) {
 
       <button
         type="button"
-        className="btn btn-light rounded-0 w-100 py-3 fw-semibold text-danger"
+        className="btn btn-light rounded-0 w-100 py-3 fw-semibold"
+        style={{ color: "#087F80" }}
         onClick={() => {
           setOpen(false);
           onNavigate?.();
@@ -346,7 +349,7 @@ function NotificationBell({ onNavigate }) {
           <span
             className="position-absolute top-0 end-0 badge rounded-pill text-white"
             style={{
-              backgroundColor: "#fc2779",
+              backgroundColor: "#087F80",
               fontSize: 11,
             }}
           >
@@ -366,7 +369,10 @@ function NotificationBell({ onNavigate }) {
           }}
         >
           <div className="d-flex justify-content-between align-items-center p-3 border-bottom">
-            <h6 className="m-0 fw-bold">
+            <h6
+              className="m-0 fw-bold"
+              style={{ color: "#087F80" }}
+            >
               Notifications
             </h6>
 
@@ -376,7 +382,7 @@ function NotificationBell({ onNavigate }) {
                 disabled={loading}
                 onClick={handleMarkAllRead}
                 className="btn btn-link btn-sm text-decoration-none p-0"
-                style={{ color: "#fc2779" }}
+                style={{ color: "#087F80" }}
               >
                 Mark all as read
               </button>
@@ -411,7 +417,10 @@ function NotificationBell({ onNavigate }) {
             }}
           >
             <div className="offcanvas-header border-bottom">
-              <h5 className="offcanvas-title fw-bold">
+              <h5
+                className="offcanvas-title fw-bold"
+                style={{ color: "#087F80" }}
+              >
                 Notifications
               </h5>
 
@@ -431,7 +440,7 @@ function NotificationBell({ onNavigate }) {
                     disabled={loading}
                     onClick={handleMarkAllRead}
                     className="btn btn-link btn-sm text-decoration-none p-0"
-                    style={{ color: "#fc2779" }}
+                    style={{ color: "#087F80" }}
                   >
                     Mark all as read
                   </button>

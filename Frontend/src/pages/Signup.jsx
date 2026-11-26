@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { signupUser } from "../services/authService";
 import { Link } from "react-router-dom";
+import sabkooLogo from "../assets/branding/sabkoo-logo.png";
 
 function Signup() {
   // Common fields
@@ -21,7 +22,6 @@ function Signup() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-
   // Reset form after successful signup
   function resetForm() {
     setRole("customer");
@@ -40,7 +40,6 @@ function Signup() {
   async function handleSubmit(event) {
     event.preventDefault();
     setMessage("");
-
     setLoading(true);
 
     try {
@@ -49,7 +48,7 @@ function Signup() {
         name: name.trim(),
         email: email.trim(),
         password,
-        role
+        role,
       };
 
       // Mobile number is required for both customer and vendor
@@ -66,17 +65,16 @@ function Signup() {
         });
       }
 
+      const data = await signupUser(formData);
 
-    const data = await signupUser(formData);
+      // Display the backend response
+      setMessage(
+        data.message ||
+          "Registration successful! Please check your email to verify your account."
+      );
 
-    // Display the backend response
-    setMessage(
-      data.message ||
-      "Registration successful! Please check your email to verify your account."
-    );
-
-    // Clear the signup form
-    resetForm();
+      // Clear the signup form
+      resetForm();
 
     } catch (error) {
       setMessage(error.message || "Unable to create account.");
@@ -85,46 +83,64 @@ function Signup() {
     }
   }
 
-  // Reusable input styling
-  const inputClass = "form-control form-control-sm";
+  // Reusable Bootstrap input styling
+  const inputClass = "form-control rounded-3 py-2";
   const labelClass = "form-label small fw-semibold mb-1";
 
   return (
     <div
-      className="container-fluid min-vh-100 d-flex justify-content-center align-items-center py-3 px-2"
-      style={{ backgroundColor: "#fff5f8" }}
+      className="container-fluid min-vh-100 d-flex justify-content-center align-items-center py-4 px-3"
+      style={{ backgroundColor: "#EEF8F7" }}
     >
       <div
         className="card border-0 shadow-sm"
         style={{
-          maxWidth: "850px",
+          maxWidth: role === "vendor" ? "850px" : "600px",
           width: "100%",
-          borderRadius: "14px"
+          borderRadius: "18px",
         }}
       >
         <div className="card-body p-3 p-md-4">
-          {/* Header */}
-          <h1
-            className="text-center fw-bold mb-1"
-            style={{ color: "#e91e63", fontSize: "2rem" }}
-          >
-            nykaa
-          </h1>
 
-          <p className="text-center text-secondary small mb-3">
-            Create your account
+          {/* Logo */}
+          <div className="text-center mb-3">
+            <img
+              src={sabkooLogo}
+              alt="Sabkoo"
+              style={{
+                width: "220px",
+                maxWidth: "100%",
+                height: "auto",
+              }}
+            />
+          </div>
+
+          {/* Heading */}
+          <h3
+            className="text-center fw-bold mb-2"
+            style={{ color: "#087F80" }}
+          >
+            Create Account
+          </h3>
+
+          <p className="text-center text-secondary small mb-4">
+            Join the Sabkoo community
           </p>
 
           <form onSubmit={handleSubmit}>
-            {/* Account type */}
-            <div className="mb-2">
-              <label htmlFor="role" className={labelClass}>
+
+            {/* Account Type */}
+            <div className="mb-3">
+              <label
+                htmlFor="role"
+                className={labelClass}
+              >
                 Account Type
               </label>
 
               <select
                 id="role"
-                className="form-select form-select-sm"
+                className="form-select rounded-3 py-2"
                 value={role}
                 onChange={(event) => {
                   setRole(event.target.value);
@@ -134,14 +150,16 @@ function Signup() {
               >
                 <option value="customer">Customer</option>
                 <option value="vendor">Vendor</option>
-    
               </select>
             </div>
 
             {/* Name and Email */}
-            <div className="row g-2">
+            <div className="row g-3">
               <div className="col-md-6">
-                <label htmlFor="name" className={labelClass}>
+                <label
+                  htmlFor="name"
+                  className={labelClass}
+                >
                   {role === "vendor"
                     ? "Contact Person's Name"
                     : "Full Name"}
@@ -151,86 +169,118 @@ function Signup() {
                   id="name"
                   type="text"
                   className={inputClass}
+                  placeholder="Enter your name"
                   value={name}
-                  onChange={(event) => setName(event.target.value)}
+                  onChange={(event) =>
+                    setName(event.target.value)
+                  }
                   required
                 />
               </div>
 
               <div className="col-md-6">
-                <label htmlFor="signup-email" className={labelClass}>
-                  {role === "vendor" ? "Business Email" : "Email Address"}
+                <label
+                  htmlFor="signup-email"
+                  className={labelClass}
+                >
+                  {role === "vendor"
+                    ? "Business Email"
+                    : "Email Address"}
                 </label>
 
                 <input
                   id="signup-email"
                   type="email"
                   className={inputClass}
+                  placeholder="Enter your email"
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(event) =>
+                    setEmail(event.target.value)
+                  }
                   required
                 />
               </div>
             </div>
 
-            {/* Mobile Number: Customer and Vendor only */}
-            
-              <div className="row g-2 mt-0">
-                <div className={role === "vendor" ? "col-md-6" : "col-12"}>
-                  <label htmlFor="mobile" className={labelClass}>
-                    Mobile Number
+            {/* Mobile Number */}
+            <div className="row g-3 mt-0">
+              <div
+                className={
+                  role === "vendor"
+                    ? "col-md-6"
+                    : "col-12"
+                }
+              >
+                <label
+                  htmlFor="mobile"
+                  className={labelClass}
+                >
+                  Mobile Number
+                </label>
+
+                <input
+                  id="mobile"
+                  type="tel"
+                  className={inputClass}
+                  placeholder="Enter 10-digit mobile number"
+                  value={mobile}
+                  onChange={(event) =>
+                    setMobile(event.target.value)
+                  }
+                  pattern="[0-9]{10}"
+                  maxLength={10}
+                  title="Enter a 10-digit mobile number"
+                  required
+                />
+              </div>
+
+              {/* Vendor Store Name */}
+              {role === "vendor" && (
+                <div className="col-md-6">
+                  <label
+                    htmlFor="storeName"
+                    className={labelClass}
+                  >
+                    Store Name
                   </label>
 
                   <input
-                    id="mobile"
-                    type="tel"
+                    id="storeName"
+                    type="text"
                     className={inputClass}
-                    value={mobile}
-                    onChange={(event) => setMobile(event.target.value)}
-                    pattern="[0-9]{10}"
-                    maxLength={10}
-                    title="Enter a 10-digit mobile number"
+                    placeholder="Enter your store name"
+                    value={storeName}
+                    onChange={(event) =>
+                      setStoreName(event.target.value)
+                    }
                     required
                   />
                 </div>
+              )}
+            </div>
 
-                {/* Vendor Store Name */}
-                {role === "vendor" && (
-                  <div className="col-md-6">
-                    <label htmlFor="storeName" className={labelClass}>
-                      Store Name
-                    </label>
-
-                    <input
-                      id="storeName"
-                      type="text"
-                      className={inputClass}
-                      value={storeName}
-                      onChange={(event) => setStoreName(event.target.value)}
-                      required
-                    />
-                  </div>
-                )}
-              </div>
-            
-
-            {/* Vendor-only fields */}
+            {/* Vendor-only Fields */}
             {role === "vendor" && (
               <>
-                <hr className="my-3" />
+                <hr
+                  className="my-4"
+                  style={{ borderColor: "#087F80" }}
+                />
 
                 <h6
-                  className="fw-bold mb-2"
-                  style={{ color: "#e91e63" }}
+                  className="fw-bold mb-3"
+                  style={{ color: "#087F80" }}
                 >
                   Business Details
                 </h6>
 
-                {/* postal code */}
-                <div className="row g-2">
-
+                {/* Postal Code */}
+                <div className="row g-3">
                   <div className="col-md-12">
-                    <label htmlFor="postalCode" className={labelClass}>
+                    <label
+                      htmlFor="postalCode"
+                      className={labelClass}
+                    >
                       Postal Code
                     </label>
 
@@ -238,17 +288,23 @@ function Signup() {
                       id="postalCode"
                       type="text"
                       className={inputClass}
+                      placeholder="Enter postal code"
                       value={postalCode}
-                      onChange={(event) => setPostalCode(event.target.value)}
+                      onChange={(event) =>
+                        setPostalCode(event.target.value)
+                      }
                       required
                     />
                   </div>
                 </div>
 
                 {/* City and State */}
-                <div className="row g-2 mt-0">
+                <div className="row g-3 mt-0">
                   <div className="col-md-6">
-                    <label htmlFor="city" className={labelClass}>
+                    <label
+                      htmlFor="city"
+                      className={labelClass}
+                    >
                       City
                     </label>
 
@@ -256,14 +312,20 @@ function Signup() {
                       id="city"
                       type="text"
                       className={inputClass}
+                      placeholder="Enter city"
                       value={city}
-                      onChange={(event) => setCity(event.target.value)}
+                      onChange={(event) =>
+                        setCity(event.target.value)
+                      }
                       required
                     />
                   </div>
 
                   <div className="col-md-6">
-                    <label htmlFor="state" className={labelClass}>
+                    <label
+                      htmlFor="state"
+                      className={labelClass}
+                    >
                       State
                     </label>
 
@@ -271,22 +333,29 @@ function Signup() {
                       id="state"
                       type="text"
                       className={inputClass}
+                      placeholder="Enter state"
                       value={state}
-                      onChange={(event) => setState(event.target.value)}
+                      onChange={(event) =>
+                        setState(event.target.value)
+                      }
                       required
                     />
                   </div>
                 </div>
 
-                {/* Business address */}
-                <div className="mt-2">
-                  <label htmlFor="businessAddress" className={labelClass}>
+                {/* Business Address */}
+                <div className="mt-3">
+                  <label
+                    htmlFor="businessAddress"
+                    className={labelClass}
+                  >
                     Business Address
                   </label>
 
                   <textarea
                     id="businessAddress"
-                    className="form-control form-control-sm"
+                    className={inputClass}
+                    placeholder="Enter your business address"
                     rows="2"
                     value={businessAddress}
                     onChange={(event) =>
@@ -295,14 +364,15 @@ function Signup() {
                     required
                   />
                 </div>
-
-
               </>
             )}
 
-            {/* Password: All account types */}
-            <div className="mt-2">
-              <label htmlFor="signup-password" className={labelClass}>
+            {/* Password */}
+            <div className="mt-3">
+              <label
+                htmlFor="signup-password"
+                className={labelClass}
+              >
                 Password
               </label>
 
@@ -310,8 +380,11 @@ function Signup() {
                 id="signup-password"
                 type="password"
                 className={inputClass}
+                placeholder="Create your password"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) =>
+                  setPassword(event.target.value)
+                }
                 minLength={8}
                 autoComplete="new-password"
                 required
@@ -322,17 +395,16 @@ function Signup() {
               </small>
             </div>
 
-            {/* Submit */}
+            {/* Create Account Button */}
             <button
               type="submit"
-              className="btn btn-sm w-100 text-white mt-3 py-2"
-              style={{
-                backgroundColor: "#e91e63",
-                borderRadius: "6px"
-              }}
+              className="btn w-100 text-white fw-semibold mt-4 py-2 rounded-3"
+              style={{ backgroundColor: "#087F80" }}
               disabled={loading}
             >
-              {loading ? "Creating account..." : "Create Account"}
+              {loading
+                ? "Creating account..."
+                : "Create Account"}
             </button>
           </form>
 
@@ -346,12 +418,13 @@ function Signup() {
             </div>
           )}
 
-          {/* Sign in link */}
-          <p className="text-center small mt-3 mb-0">
+          {/* Sign In Link */}
+          <p className="text-center small mt-4 mb-0">
             Already have an account?{" "}
             <Link
               to="/signin"
-              style={{ color: "#e91e63", fontWeight: "600" }}
+              className="text-decoration-none fw-semibold"
+              style={{ color: "#087F80" }}
             >
               Sign In
             </Link>

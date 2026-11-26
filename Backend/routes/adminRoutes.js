@@ -412,9 +412,9 @@ router.post(
         await transporter.sendMail({
           from: process.env.EMAIL_USER,
           to: normalizedEmail,
-          subject: "Invitation to Join Nykaa as Admin",
+          subject: "Invitation to Join Sabkoo as Admin",
           text:
-            `You have been invited to join Nykaa as an administrator. ` +
+            `You have been invited to join Sabkoo as an administrator. ` +
             `Accept your invitation here: ${inviteLink}. ` +
             `This link expires in 24 hours.`,
         });

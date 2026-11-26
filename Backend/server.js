@@ -29,7 +29,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/reminders", reminderRoutes);
 
 app.get("/", (req, res) => {
-  res.send("Nykaa backend is running!");
+  res.send("Sabkoo backend is running!");
 });
 
 const PORT = process.env.PORT || 5000;

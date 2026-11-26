@@ -1,6 +1,6 @@
-
 import { useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
+import sabkooLogo from "../assets/branding/sabkoo-logo.png";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -34,17 +34,17 @@ function ResetPassword() {
 
     try {
       const response = await fetch(
-          `${API_URL}/api/auth/reset-password`,
+        `${API_URL}/api/auth/reset-password`,
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             email,
             token,
-            newPassword
-          })
+            newPassword,
+          }),
         }
       );
 
@@ -67,40 +67,63 @@ function ResetPassword() {
   }
 
   return (
-    <div className="container-fluid min-vh-100 d-flex justify-content-center align-items-center bg-light">
+    <div
+      className="container-fluid min-vh-100 d-flex justify-content-center align-items-center py-4 px-3"
+      style={{ backgroundColor: "#EEF8F7" }}
+    >
       <div
-        className="card shadow border-0 p-4"
-        style={{ maxWidth: "420px", width: "100%" }}
+        className="card shadow-sm border-0 p-3 p-md-4"
+        style={{
+          maxWidth: "440px",
+          width: "100%",
+          borderRadius: "18px",
+        }}
       >
         <div className="card-body">
 
-          <h1
-            className="text-center fw-bold mb-3"
-            style={{ color: "#e91e63" }}
-          >
-            nykaa
-          </h1>
+          {/* Logo */}
+          <div className="text-center mb-3">
+            <img
+              src={sabkooLogo}
+              alt="Sabkoo"
+              style={{
+                width: "220px",
+                maxWidth: "100%",
+                height: "auto",
+              }}
+            />
+          </div>
 
-          <h4 className="text-center mb-2">
+          {/* Heading */}
+          <h3
+            className="text-center fw-bold mb-2"
+            style={{ color: "#087F80" }}
+          >
             Reset Password
-          </h4>
+          </h3>
 
           <p className="text-center text-secondary small mb-4">
-            Enter your new password below.
+            {success
+              ? "Your password has been updated successfully."
+              : "Enter your new password below."}
           </p>
 
           {!success && (
             <form onSubmit={handleSubmit}>
 
+              {/* New Password */}
               <div className="mb-3">
-                <label htmlFor="newPassword" className="form-label">
+                <label
+                  htmlFor="newPassword"
+                  className="form-label fw-semibold"
+                >
                   New Password
                 </label>
 
                 <input
                   id="newPassword"
                   type="password"
-                  className="form-control"
+                  className="form-control rounded-3 py-2"
                   placeholder="Enter new password"
                   value={newPassword}
                   onChange={(event) =>
@@ -110,17 +133,25 @@ function ResetPassword() {
                   autoComplete="new-password"
                   required
                 />
+
+                <small className="text-secondary">
+                  Password must contain at least 8 characters.
+                </small>
               </div>
 
+              {/* Confirm Password */}
               <div className="mb-3">
-                <label htmlFor="confirmPassword" className="form-label">
+                <label
+                  htmlFor="confirmPassword"
+                  className="form-label fw-semibold"
+                >
                   Confirm New Password
                 </label>
 
                 <input
                   id="confirmPassword"
                   type="password"
-                  className="form-control"
+                  className="form-control rounded-3 py-2"
                   placeholder="Confirm new password"
                   value={confirmPassword}
                   onChange={(event) =>
@@ -132,10 +163,11 @@ function ResetPassword() {
                 />
               </div>
 
+              {/* Reset Password Button */}
               <button
                 type="submit"
-                className="btn w-100 text-white fw-semibold"
-                style={{ backgroundColor: "#e91e63" }}
+                className="btn w-100 text-white fw-semibold py-2 rounded-3"
+                style={{ backgroundColor: "#087F80" }}
                 disabled={loading}
               >
                 {loading ? "Updating..." : "Reset Password"}
@@ -144,23 +176,41 @@ function ResetPassword() {
             </form>
           )}
 
+          {/* Success or Error Message */}
           {message && (
             <div
-              className={`alert ${success ? "alert-success" : "alert-danger"} mt-3 mb-0 small`}
+              className={`alert ${
+                success ? "alert-success" : "alert-danger"
+              } mt-3 mb-0 small`}
               role="status"
             >
               {message}
             </div>
           )}
 
+          {/* Go to Sign In */}
           {success && (
             <Link
               to="/signin"
-              className="btn w-100 text-white mt-3"
-              style={{ backgroundColor: "#e91e63" }}
+              className="btn w-100 text-white fw-semibold mt-3 py-2 rounded-3"
+              style={{ backgroundColor: "#087F80" }}
             >
               Go to Sign In
             </Link>
+          )}
+
+          {/* Back to Sign In */}
+          {!success && (
+            <p className="text-center mt-4 mb-0">
+              <Link
+                to="/signin"
+                className="text-decoration-none fw-semibold small"
+                style={{ color: "#087F80" }}
+              >
+                <i className="bi bi-arrow-left me-2" />
+                Back to Sign In
+              </Link>
+            </p>
           )}
 
         </div>

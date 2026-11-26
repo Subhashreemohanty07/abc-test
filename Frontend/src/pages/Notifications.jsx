@@ -29,7 +29,7 @@ function Notifications() {
     const token = localStorage.getItem("token");
 
     if (!token) {
-      navigate("/login");
+      navigate("/signin");
       return;
     }
 
@@ -157,7 +157,10 @@ function Notifications() {
       {/* PAGE HEADER */}
       <div className="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
         <div>
-          <h3 className="fw-bold mb-1">
+          <h3
+            className="fw-bold mb-1"
+            style={{ color: "#087F80" }}
+          >
             All Notifications
           </h3>
 
@@ -180,11 +183,16 @@ function Notifications() {
         {["all", "unread", "read"].map((option) => (
           <button
             key={option}
-            className={`btn btn-sm ${
-              filter === option
-                ? "btn-dark"
-                : "btn-outline-secondary"
-            }`}
+            className="btn btn-sm"
+            style={{
+              backgroundColor:
+                filter === option ? "#087F80" : "#FFFFFF",
+              color:
+                filter === option ? "#FFFFFF" : "#087F80",
+              border: "1px solid #087F80",
+              borderRadius: "6px",
+              fontWeight: 500,
+            }}
             onClick={() => {
               setFilter(option);
               setPage(1);
@@ -223,7 +231,7 @@ function Notifications() {
               style={{
                 background: notification.isRead
                   ? "#fff"
-                  : "#fff0f6",
+                  : "#EEF8F7",
                 cursor: "pointer",
               }}
             >
@@ -232,7 +240,7 @@ function Notifications() {
                   icons[notification.type] || "bi-bell"
                 }`}
                 style={{
-                  color: "#fc2779",
+                  color: "#087F80",
                   fontSize: 22,
                 }}
               />
@@ -249,7 +257,7 @@ function Notifications() {
                         width: 8,
                         height: 8,
                         borderRadius: "50%",
-                        background: "#fc2779",
+                        background: "#087F80",
                         flexShrink: 0,
                       }}
                     />
@@ -291,7 +299,12 @@ function Notifications() {
           </button>
 
           <button
-            className="btn btn-outline-secondary btn-sm"
+            className="btn btn-sm"
+            style={{
+              color: "#087F80",
+              border: "1px solid #087F80",
+              backgroundColor: "#FFFFFF",
+            }}
             disabled={loading || page >= totalPages}
             onClick={() =>
               setPage((previous) => previous + 1)

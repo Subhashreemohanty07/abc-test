@@ -59,66 +59,45 @@ function Footer({ showSocial = true })  {
       <footer className="nykaa-footer" id="help">
 
         {/* FOOTER TOP */}
-        <div className="footer-top row g-4">
+        <div className="footer-top row g-4 text-center">
 
-          {/* NEWSLETTER */}
-          <div className="footer-newsletter col-12 col-md-4">
-            <h5>
-              <i className="bi bi-envelope"></i>
-              Get special discount on your inbox
-            </h5>
+          {/* SHOP WITH SABKOO */}
+          <div className="col-12 col-md-4 footer-feature">
+            <i className="bi bi-bag-check footer-feature-icon"></i>
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                alert("Thank you for subscribing!");
-              }}
-            >
-              <input
-                type="email"
-                placeholder="Your Email"
-                required
-              />
+            <h5>Shop with Sabkoo</h5>
 
-              <button type="submit">SEND</button>
-            </form>
+            <p>Discover fashion for every occasion</p>
+
+            <Link to="/products">
+              Explore Products
+            </Link>
           </div>
 
-          {/* MOBILE APP */}
-          <div className="col-12 col-md-4">
-            <h5>
-              <i className="bi bi-phone"></i>
-              EXPERIENCE THE NYKAA MOBILE APP
-            </h5>
+          {/* BECOME A SELLER */}
+          <div className="col-12 col-md-4 footer-feature">
+            <i className="bi bi-shop footer-feature-icon"></i>
 
-            <div className="app-links d-flex flex-wrap gap-2">
-              <a
-                href="https://play.google.com/store"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <i className="bi bi-google-play"></i> Google Play
-              </a>
+            <h5>Become a Seller</h5>
 
-              <a
-                href="https://www.apple.com/app-store/"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <i className="bi bi-apple"></i> App Store
-              </a>
-            </div>
+            <p>Grow your business with Sabkoo</p>
+
+            <Link to="/signup">
+              Start Selling
+            </Link>
           </div>
 
-          {/* CONTACT */}
-          <div className="col-12 col-md-4">
-            <h5>
-              <i className="bi bi-telephone"></i>
-              FOR ANY HELP, YOU MAY CALL US AT
-            </h5>
+          {/* MANAGE ORDERS */}
+          <div className="col-12 col-md-4 footer-feature">
+            <i className="bi bi-box-seam footer-feature-icon"></i>
 
-            <p>1800-267-4444</p>
-            <p>(All days, 8 AM to 10 PM)</p>
+            <h5>Manage Your Orders</h5>
+
+            <p>View and track your purchases</p>
+
+            <Link to="/orders">
+              My Orders
+            </Link>
           </div>
 
         </div>
@@ -126,62 +105,83 @@ function Footer({ showSocial = true })  {
         {/* FOOTER BOTTOM */}
         <div className="footer-bottom row g-4">
 
-          <div className="footer-brand col-6 col-lg">
+          {/* SABKOO BRAND */}
+          <div className="footer-brand col-12 col-md-6 col-lg-3">
             <h2>
-              <Link to="/">nykaa</Link>
+              <Link to="/" className="footer-brand-name">
+                Sabkoo
+              </Link>
             </h2>
-            <p>Who are we?</p>
-            <p>Careers</p>
-            <p>Authenticity</p>
-            <p>Press</p>
-            <p>Testimonials</p>
-            <p>Sustainability</p>
-            <p>Investor Relations</p>
+
+            <p>Marketplace for Community</p>
+
+            <p>Fashion for Everyone.</p>
+
+            <p>Everything in One Marketplace.</p>
           </div>
 
-          <div className="col-6 col-lg">
+          {/* HELP */}
+          <div className="col-6 col-md-6 col-lg-3">
             <h5>Help</h5>
-            <a href="#help">Contact Us</a>
-            <a href="#help">Frequently Asked Questions</a>
-            <a href="#help">Store Locator</a>
-            <a href="#help">Cancellation & Return</a>
-            <a href="#help">Shipping & Delivery</a>
-            <a href="#help">Sell on Nykaa</a>
+
+            <p>Contact Us</p>
+
+            <p>Frequently Asked Questions</p>
+
+            <Link to="/orders">Track Your Order</Link>
+
+            <p>Cancellation & Return</p>
+
+            <p>Shipping & Delivery</p>
+
+            <Link to="/signup">Sell on Sabkoo</Link>
           </div>
 
-          <div className="col-6 col-lg">
-            <h5>Inspire Me</h5>
-            <a href="#categories">Beauty Book</a>
-            <a href="#categories">Games Board</a>
-            <a href="#categories">Buying Guides</a>
-          </div>
-
-          <div className="col-6 col-lg">
+          {/* QUICK LINKS */}
+          <div className="col-6 col-md-6 col-lg-3">
             <h5>Quick Links</h5>
-            <a href="#offers">Offer Zone</a>
-            <a href="#categories">New Launches</a>
-            <a href="#men">Nykaa Man</a>
-            <a href="#women">Nykaa Fashion</a>
-            <a href="#brands">Nykaa Pro</a>
-            <a href="#footer">Sitemap</a>
+
+            <Link to="/products">
+              All Products
+            </Link>
+
+            <Link to="/products?sort=newest">
+              New Arrivals
+            </Link>
+
+            <Link to="/#offers">
+              Offer Zone
+            </Link>
+
+            <Link to="/products?category=women">
+              Women's Fashion
+            </Link>
+
+            <Link to="/products?category=men">
+              Men's Fashion
+            </Link>
           </div>
 
-          <div className="col-6 col-lg">
+          {/* TOP CATEGORIES */}
+          <div className="col-6 col-md-6 col-lg-3">
             <h5>Top Categories</h5>
-            <a href="#categories">Makeup</a>
-            <a href="#categories">Skin</a>
-            <a href="#categories">Hair</a>
-            <a href="#categories">Bath & Body</a>
-            <a href="#categories">Appliances</a>
-            <a href="#women">Women</a>
-            <a href="#men">Men</a>
+
+            <p>Sarees</p>
+            <p>Kurtas & Kurtis</p>
+            <p>Lehengas</p>
+            <p>Dresses</p>
+            <p>T-Shirts</p>
+            <p>Shirts</p>
+            <p>Jeans</p>
+            <p>Ethnic Wear</p>
           </div>
 
         </div>
 
         {/* COPYRIGHT */}
         <div className="copyright">
-          © {new Date().getFullYear()} Nykaa Clone. Made with love.
+          © {new Date().getFullYear()} Sabkoo.
+          All rights reserved.
         </div>
 
       </footer>
