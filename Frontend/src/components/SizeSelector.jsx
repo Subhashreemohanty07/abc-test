@@ -1,10 +1,12 @@
-
 import { SIZE_GROUPS } from "../constants/productOptions";
 
 function SizeSelector({ selectedSizes = [], onChange }) {
   return (
-    <div className="col-12">
-      <label className="form-label fw-semibold">
+    <div className="col-12 text-start">
+      <label
+        className="form-label fw-semibold"
+        style={{ color: "#2D202E" }}
+      >
         Available Sizes *
       </label>
 
@@ -16,35 +18,43 @@ function SizeSelector({ selectedSizes = [], onChange }) {
           </p>
 
           <div className="d-flex flex-wrap gap-2">
-            {group.sizes.map((size) => (
-              <button
-                key={size}
-                type="button"
-                className="btn btn-sm px-3 py-2"
-                aria-pressed={selectedSizes.includes(size)}
-                style={{
-                  backgroundColor: selectedSizes.includes(size)
-                    ? "#fc2779"
-                    : "#ffffff",
-                  color: selectedSizes.includes(size)
-                    ? "#ffffff"
-                    : "#333333",
-                  border: selectedSizes.includes(size)
-                    ? "1px solid #fc2779"
-                    : "1px solid #ced4da",
-                  minWidth: "45px",
-                }}
-                onClick={() => {
-                  const updatedSizes = selectedSizes.includes(size)
-                    ? selectedSizes.filter((item) => item !== size)
-                    : [...selectedSizes, size];
+            {group.sizes.map((size) => {
+              const isSelected = selectedSizes.includes(size);
 
-                  onChange(updatedSizes);
-                }}
-              >
-                {size}
-              </button>
-            ))}
+              return (
+                <button
+                  key={size}
+                  type="button"
+                  className="btn btn-sm rounded-3 px-3 py-2"
+                  aria-pressed={isSelected}
+                  style={{
+                    background: isSelected
+                    ? "linear-gradient(180deg, #E65A20, #D93620)"
+                    : "#FFFFFF",
+                    color: isSelected
+                      ? "#FFFFFF"
+                      : "#2D202E",
+                    border: isSelected
+                      ? "1px solid #D93620"
+                      : "1px solid #F4DCD3",
+                    fontWeight: isSelected ? "600" : "400",
+                    minWidth: "45px",
+                    transition: "all 0.2s ease",
+                  }}
+                  onClick={() => {
+                    const updatedSizes = isSelected
+                      ? selectedSizes.filter(
+                          (item) => item !== size
+                        )
+                      : [...selectedSizes, size];
+
+                    onChange(updatedSizes);
+                  }}
+                >
+                  {size}
+                </button>
+              );
+            })}
           </div>
 
         </div>

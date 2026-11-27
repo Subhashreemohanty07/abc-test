@@ -270,31 +270,61 @@ function AddProduct({ onProductAdded, onCancel }) {
   }
 
   return (
-    <div className="card border-0 shadow-sm rounded-4">
-      <div className="card-body p-4">
+    <div
+      className="card border-0 shadow-sm rounded-4 overflow-hidden"
+      style={{
+        backgroundColor: "#FFFFFF",
+        border: "1px solid #F4DCD3"
+      }}
+    >
+    <div className="card-body p-3 p-md-4">
 
-        <h4 className="fw-bold mb-1">
-          Add New Product
-        </h4>
+        <div
+  className="rounded-4 p-3 p-md-4 mb-4 text-start"
+  style={{
+    backgroundColor: "#FFF1EB",
+    border: "1px solid #F4DCD3"
+  }}
+>
+  <div className="d-flex align-items-center gap-3">
+    <div
+      className="rounded-3 p-3 text-white flex-shrink-0"
+      style={{
+        background: "linear-gradient(180deg, #E65A20, #D93620)"
+      }}
+    >
+      <i className="bi bi-plus-circle fs-4"></i>
+    </div>
 
-        <p className="text-secondary mb-4">
-          Enter your product details, configure variant
-          inventory and upload product images.
-        </p>
+    <div>
+      <h4
+        className="fw-bold mb-1"
+        style={{ color: "#2D202E" }}
+      >
+        Add New Product
+      </h4>
 
-        <form onSubmit={handleSubmit}>
+      <p className="text-secondary small mb-0">
+        Enter your product details, configure variant
+        inventory and upload product images.
+      </p>
+    </div>
+  </div>
+</div>
+
+        <form onSubmit={handleSubmit} className="text-start">
           <div className="row g-3">
 
             {/* Product Name */}
             <div className="col-md-6">
-              <label className="form-label">
+              <label className="form-label fw-semibold">
                 Product Name *
               </label>
 
               <input
                 type="text"
                 name="productName"
-                className="form-control"
+                className="form-control rounded-3 py-2"
                 value={formData.productName}
                 onChange={handleChange}
                 required
@@ -303,14 +333,14 @@ function AddProduct({ onProductAdded, onCancel }) {
 
             {/* Brand */}
             <div className="col-md-6">
-              <label className="form-label">
+              <label className="form-label fw-semibold">
                 Brand *
               </label>
 
               <input
                 type="text"
                 name="brand"
-                className="form-control"
+                className="form-control rounded-3 py-2"
                 value={formData.brand}
                 onChange={handleChange}
                 required
@@ -319,13 +349,13 @@ function AddProduct({ onProductAdded, onCancel }) {
 
             {/* Description */}
             <div className="col-12">
-              <label className="form-label">
+              <label className="form-label fw-semibold">
                 Description *
               </label>
 
               <textarea
                 name="description"
-                className="form-control"
+                className="form-control rounded-3 py-2"
                 rows="3"
                 value={formData.description}
                 onChange={handleChange}
@@ -335,13 +365,13 @@ function AddProduct({ onProductAdded, onCancel }) {
 
             {/* Category */}
             <div className="col-md-6">
-              <label className="form-label">
+              <label className="form-label fw-semibold">
                 Category *
               </label>
 
               <select
                 name="category"
-                className="form-select"
+                className="form-select rounded-3 py-2"
                 value={formData.category}
                 onChange={handleChange}
               >
@@ -352,13 +382,13 @@ function AddProduct({ onProductAdded, onCancel }) {
 
             {/* Subcategory */}
             <div className="col-md-6">
-              <label className="form-label">
+              <label className="form-label fw-semibold">
                 Subcategory *
               </label>
 
               <select
                 name="subCategory"
-                className="form-select"
+                className="form-select rounded-3 py-2"
                 value={formData.subCategory}
                 onChange={handleChange}
                 required
@@ -395,14 +425,14 @@ function AddProduct({ onProductAdded, onCancel }) {
 
             {/* Original Price */}
             <div className="col-md-6">
-              <label className="form-label">
+              <label className="form-label fw-semibold">
                 Original Price (₹) *
               </label>
 
               <input
                 type="number"
                 name="price"
-                className="form-control"
+                className="form-control rounded-3 py-2"
                 min="1"
                 value={formData.price}
                 onChange={handleChange}
@@ -412,14 +442,14 @@ function AddProduct({ onProductAdded, onCancel }) {
 
             {/* Discount Price */}
             <div className="col-md-6">
-              <label className="form-label">
+              <label className="form-label fw-semibold">
                 Discount Price (₹)
               </label>
 
               <input
                 type="number"
                 name="discountPrice"
-                className="form-control"
+                className="form-control rounded-3 py-2"
                 min="0"
                 value={formData.discountPrice}
                 onChange={handleChange}
@@ -446,14 +476,14 @@ function AddProduct({ onProductAdded, onCancel }) {
 
             {/* Product Images */}
             <div className="col-12">
-              <label className="form-label">
+              <label className="form-label fw-semibold">
                 Product Images * (Maximum 5)
               </label>
 
               <input
                 id="productImages"
                 type="file"
-                className="form-control"
+                className="form-control rounded-3 py-2"
                 accept="image/jpeg,image/png,image/webp"
                 multiple
                 onChange={handleImageChange}
@@ -510,17 +540,28 @@ function AddProduct({ onProductAdded, onCancel }) {
 
             <button
               type="submit"
-              className="btn text-white px-4"
-              style={{ backgroundColor: "#e91e63" }}
+              className="btn text-white fw-semibold rounded-3 px-4 py-2"
+              style={{
+                background: "linear-gradient(180deg, #E65A20, #D93620)",
+                border: "none",
+                boxShadow: "0 4px 10px rgba(217, 54, 32, 0.18)"
+              }}
               disabled={loading}
             >
+              <i className="bi bi-check-circle me-2"></i>
+
               {loading ? "Saving..." : "Save Product"}
             </button>
 
             {onCancel && (
               <button
                 type="button"
-                className="btn btn-outline-secondary"
+                className="btn rounded-3 px-4 py-2"
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  color: "#D93620",
+                  border: "1px solid #D93620"
+                }}
                 onClick={onCancel}
                 disabled={loading}
               >

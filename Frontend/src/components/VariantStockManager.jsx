@@ -1,4 +1,3 @@
-
 import { COLOR_OPTIONS } from "../constants/productOptions";
 
 // Generate size and colour combinations
@@ -19,7 +18,7 @@ export const generateVariants = (
       return {
         size,
         color,
-        stock: existingVariant?.stock ?? 0
+        stock: existingVariant?.stock ?? 0,
       };
     })
   );
@@ -35,7 +34,7 @@ export const calculateTotalStock = (variants = []) => {
 
 function VariantStockManager({
   variants = [],
-  onChange
+  onChange,
 }) {
 
   // Update stock for a specific size-colour combination
@@ -72,41 +71,77 @@ function VariantStockManager({
   const totalStock = calculateTotalStock(variants);
 
   return (
-    <div className="col-12">
+    <div className="col-12 text-start">
 
-      <label className="form-label fw-semibold">
+      <label
+        className="form-label fw-semibold"
+        style={{ color: "#2D202E" }}
+      >
         Variant Inventory *
       </label>
 
       {variants.length === 0 ? (
 
-        <div className="alert alert-light border">
+        <div
+          className="rounded-3 p-3"
+          style={{
+            backgroundColor: "#FFF1EB",
+            border: "1px solid #F4DCD3",
+            color: "#2D202E",
+          }}
+        >
+          <i className="bi bi-info-circle me-2"></i>
+
           Please select at least one size and one colour
           to configure inventory.
         </div>
 
       ) : (
 
-        <div className="border rounded p-3">
+        <div
+          className="rounded-3 p-2 p-md-3"
+          style={{
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #FFF1EB",
+          }}
+        >
 
-          <p className="small text-secondary">
+          <p className="small text-secondary mb-3">
             Enter available stock for each size and
             colour combination.
           </p>
 
           <div
-            className="table-responsive"
-            style={{ maxHeight: "350px", overflowY: "auto" }}
+            className="table-responsive rounded-3"
+            style={{
+              maxHeight: "350px",
+              overflowY: "auto",
+              border: "1px solid #FFF1EB",
+            }}
           >
 
-            <table className="table table-bordered align-middle mb-0">
+            <table
+              className="table table-bordered align-middle mb-0"
+              style={{ minWidth: "400px" }}
+            >
 
-              <thead className="table-light sticky-top">
+              <thead className="sticky-top">
                 <tr>
-                  <th>Size</th>
-                  <th>Colour</th>
-                  <th>Stock</th>
-                  <th>Status</th>
+                  {["Size", "Colour", "Stock", "Status"].map(
+                    (heading) => (
+                      <th
+                        key={heading}
+                        scope="col"
+                        className="text-center py-3"
+                        style={{
+                          backgroundColor: "#FFF1EB",
+                          color: "#2D202E",
+                        }}
+                      >
+                        {heading}
+                      </th>
+                    )
+                  )}
                 </tr>
               </thead>
 
@@ -117,12 +152,15 @@ function VariantStockManager({
                   <tr
                     key={JSON.stringify([
                       variant.size,
-                      variant.color
+                      variant.color,
                     ])}
                   >
 
                     {/* Size */}
-                    <td className="fw-semibold">
+                    <td
+                      className="fw-semibold text-center"
+                      style={{ color: "#2D202E" }}
+                    >
                       {variant.size}
                     </td>
 
@@ -138,8 +176,8 @@ function VariantStockManager({
                             background: getColorHex(
                               variant.color
                             ),
-                            border: "1px solid #ced4da",
-                            flexShrink: 0
+                            border: "1px solid #CED4DA",
+                            flexShrink: 0,
                           }}
                         />
 
@@ -152,13 +190,16 @@ function VariantStockManager({
                     <td>
                       <input
                         type="number"
-                        className="form-control form-control-sm"
+                        className="form-control form-control-sm rounded-2"
                         min="0"
                         step="1"
                         required
                         aria-label={`Stock for ${variant.size} ${variant.color}`}
                         value={variant.stock}
-                        style={{ minWidth: "80px" }}
+                        style={{
+                          minWidth: "80px",
+                          borderColor: "#FFF1EB",
+                        }}
                         onChange={(e) =>
                           handleStockChange(
                             variant.size,
@@ -170,7 +211,7 @@ function VariantStockManager({
                     </td>
 
                     {/* Stock status */}
-                    <td>
+                    <td className="text-center">
                       {variant.stock === "" ? (
                         <span className="badge bg-warning text-dark">
                           Enter Stock
@@ -198,12 +239,19 @@ function VariantStockManager({
 
           {/* Total stock */}
           <div
-            className="d-flex justify-content-between align-items-center mt-3 p-3 rounded"
-            style={{ backgroundColor: "#fff0f6" }}
+            className="d-flex justify-content-between align-items-center gap-3 mt-3 p-3 rounded-3"
+            style={{
+              backgroundColor: "#FFF1EB",
+              border: "1px solid #F4DCD3",
+            }}
           >
 
             <div>
-              <div className="fw-semibold">
+              <div
+                className="fw-semibold"
+                style={{ color: "#2D202E" }}
+              >
+                <i className="bi bi-boxes me-2"></i>
                 Total Available Stock
               </div>
 
@@ -213,15 +261,17 @@ function VariantStockManager({
             </div>
 
             <span
-              className="fw-bold fs-4"
-              style={{ color: "#fc2779" }}
+              className="fw-bold fs-3"
+              style={{ color: "#D93620" }}
             >
               {totalStock}
             </span>
 
           </div>
 
-          <small className="text-secondary d-block mt-2">
+          <small className="text-secondary d-block mt-3">
+            <i className="bi bi-info-circle me-1"></i>
+
             Total stock is calculated automatically.
             Enter 0 for unavailable combinations.
           </small>

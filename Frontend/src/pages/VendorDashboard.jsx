@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ProductTable from "../components/ProductTable";
@@ -6,8 +5,21 @@ import AddProduct from "../components/AddProduct"
 import StoreProfile from "../components/StoreProfile";
 import EditProduct from "../components/EditProduct";
 import Orders from "../components/Orders";
+import sabkooLogo from "../assets/branding/sabkoo-transparent-bg.png";
 
 const API_URL = import.meta.env.VITE_API_URL;
+const VENDOR_THEME = {
+  primary: "#D93620",
+  sidebar: "linear-gradient(160deg, #2D202E 0%, #30212F 70%, #452733 100%)",
+  button: "linear-gradient(180deg, #E65A20 0%, #D93620 100%)",
+  background: "#FFF1EB",
+  card: "#FFFFFF",
+  border: "#F4DCD3",
+  text: "#201B29",
+  muted: "#64748B",
+  accent: "#FFC61C",
+  shadow: "0 5px 15px rgba(190, 75, 45, 0.08)",
+};
 
 function VendorDashboard() {
   const [products, setProducts] = useState([]);
@@ -263,59 +275,79 @@ const handleBack = () => {
 
   // Overview cards
   const overviewCards = [
-    {
-      title: "Total Products",
-      count: totalProducts,
-      icon: "bi-box-seam-fill",
-      bg: "#eee8ff",
-      color: "#8054d6",
-    },
-    {
-      title: "Product In Stock",
-      count: inStock,
-      icon: "bi-check-circle-fill",
-      bg: "#d9f7ef",
-      color: "#13a98c",
-    },
-    {
-      title: "Out of Stock",
-      count: outOfStock,
-      icon: "bi-exclamation-circle-fill",
-      bg: "#ffe5ef",
-      color: "#fc2779",
-    },
-    {
-      title: "Total Stock",
-      count: totalStock,
-      icon: "bi-boxes",
-      bg: "#fff0dc",
-      color: "#ed9634",
-    },
+  {
+    title: "Total Products",
+    count: totalProducts,
+    icon: "bi-box-seam-fill",
+    bg: "#FCE2DC",
+    color: "#C94B32",
+  },
+  {
+    title: "Products In Stock",
+    count: inStock,
+    icon: "bi-check-circle-fill",
+    bg: "#D9F7EF",
+    color: "#13A98C",
+  },
+  {
+    title: "Out of Stock",
+    count: outOfStock,
+    icon: "bi-exclamation-circle-fill",
+    bg: "#FDE8E8",
+    color: "#DC3545",
+  },
+  {
+    title: "Total Stock",
+    count: totalStock,
+    icon: "bi-boxes",
+    bg: "#FFF4D6",
+    color: "#B77900",
+  },
   ];
 
   
   return (
   <div
-    className="d-flex flex-column min-vh-100"
-    style={{ backgroundColor: "#faf9fb" }}
+  className="d-flex flex-column min-vh-100"
+  style={{
+    backgroundColor: VENDOR_THEME.background,
+    color: VENDOR_THEME.text,
+  }}
   >
     {/* MOBILE NAVBAR */}
-    <div className="d-md-none bg-white border-bottom w-100">
+    
+    <div
+      className="d-md-none w-100"
+      style={{ background: VENDOR_THEME.sidebar }}
+    >
       <div className="d-flex align-items-center justify-content-between px-3 py-3">
+
         <div className="d-flex align-items-center gap-2">
-          <i
-            className="bi bi-bag-heart-fill fs-4"
-            style={{ color: "#fc2779" }}
-          ></i>
-          <span className="fw-bold fs-5">
-            Nykaa Store
+          <div className="p-1">
+            <img
+              src={sabkooLogo}
+              alt="Sabkoo"
+              style={{
+                width: "110px",
+                height: "auto",
+              }}
+            />
+          </div>
+
+          <span
+            className="small fw-semibold"
+            style={{ color: "#FFC61C" }}
+          >
+            Seller Centre
           </span>
         </div>
 
         <button
           type="button"
-          className="btn btn-light border"
-          onClick={() => setMobileMenuOpen((previous) => !previous)}
+          className="btn btn-outline-light"
+          onClick={() =>
+            setMobileMenuOpen((previous) => !previous)
+          }
           aria-label="Toggle navigation"
           aria-expanded={mobileMenuOpen}
           aria-controls="vendor-mobile-menu"
@@ -329,24 +361,34 @@ const handleBack = () => {
       </div>
 
       {mobileMenuOpen && (
-        <nav id="vendor-mobile-menu" className="border-top p-3">
-          <div className="d-flex flex-column gap-1">
+        <nav
+          id="vendor-mobile-menu"
+          className="border-top p-3"
+        >
+          <div className="d-flex flex-column gap-2">
             {menuItems.map((item) => (
               <button
                 key={item.name}
                 type="button"
                 onClick={() => handleMenuChange(item.name)}
-                className="btn text-start d-flex align-items-center gap-3 w-100"
+                className="btn text-start d-flex align-items-center gap-3 w-100 rounded-3 p-3 border-0"
+                aria-current={
+                  activeMenu === item.name ? "page" : undefined
+                }
                 style={{
-                  backgroundColor:
-                    activeMenu === item.name ? "#fff0f5" : "transparent",
-                  color:
-                    activeMenu === item.name ? "#fc2779" : "#555",
+                  background:
+                    activeMenu === item.name
+                      ? VENDOR_THEME.button
+                      : "transparent",
+                  color: "#FFFFFF",
                   fontWeight:
                     activeMenu === item.name ? "600" : "400",
-                  border: "none",
-                  padding: "12px",
-                  borderRadius: "8px",
+                  borderRadius: "14px",
+                  boxShadow:
+                    activeMenu === item.name
+                      ? "0 4px 12px rgba(217, 54, 32, 0.25)"
+                      : "none",
+                  transition: "all 0.2s ease",
                 }}
               >
                 <i className={`bi ${item.icon}`}></i>
@@ -354,12 +396,12 @@ const handleBack = () => {
               </button>
             ))}
 
-            <hr className="my-2" />
+            <hr className="text-white my-2" />
 
             <button
               type="button"
               onClick={handleLogout}
-              className="btn text-start text-danger d-flex align-items-center gap-3"
+              className="btn btn-outline-light text-start d-flex align-items-center gap-3"
             >
               <i className="bi bi-box-arrow-right"></i>
               Logout
@@ -373,50 +415,131 @@ const handleBack = () => {
 
 
         {/* SIDEBAR */}
-        <aside className="d-none d-md-flex col-md-3 col-lg-2 bg-white border-end p-3 flex-column">
-          <h3
-            className="fw-bold text-center mb-4"
-            style={{ color: "#fc2779" }}
+       
+        <aside
+          className="d-none d-md-flex col-md-3 col-lg-2 p-3 flex-column position-relative overflow-hidden"
+          style={{ background: VENDOR_THEME.sidebar,}}
+        >
+          {/* Decorative Sidebar Waves */}
+          <svg
+            viewBox="0 0 260 280"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              width: "100%",
+              height: "280px",
+              pointerEvents: "none",
+            }}
           >
-            nykaa
-          </h3>
+            <defs>
+              <linearGradient
+                id="sidebarWave"
+                x1="0%"
+                y1="100%"
+                x2="100%"
+                y2="0%"
+              >
+                <stop offset="0%" stopColor="#FF7029" />
+                <stop offset="100%" stopColor="#452733" />
+              </linearGradient>
+            </defs>
 
-          <p className="text-secondary small fw-semibold mb-2">
+            <path
+              d="M0 220 C70 110 180 180 260 0 L260 280 L0 280 Z"
+              fill="#C94B32"
+              opacity="0.12"
+            />
+
+            <path
+              d="M0 280 C65 170 190 210 260 70 L260 280 Z"
+              fill="url(#sidebarWave)"
+              opacity="0.45"
+            />
+          </svg>
+          {/* SABKOO LOGO */}
+          <div className="text-center mb-4">
+            <div className="p-2">
+              <img
+                src={sabkooLogo}
+                alt="Sabkoo"
+                style={{
+                  width: "160px",
+                  maxWidth: "100%",
+                  height: "auto",
+                }}
+              />
+            </div>
+
+            <div className="text-center mt-3 mb-4">
+              <span
+                className="d-inline-block fw-bold"
+                style={{
+                  backgroundColor: "rgba(255, 198, 28, 0.20)",
+                  color: "#FFC61C",
+                  borderRadius: "30px",
+                  padding: "8px 18px",
+                  fontSize: "16px",
+                }}
+              >
+                SELLER CENTRE
+              </span>
+            </div>
+          </div>
+
+          <p
+            className="small fw-semibold mb-3"
+            style={{ color: "#FFD5C8" }}
+          >
             VENDOR MENU
           </p>
 
-          <div className="d-flex flex-row flex-md-column flex-wrap gap-2">
+          <div className="d-flex flex-column gap-2 position-relative"
+              style={{ zIndex: 1 }}>
             {menuItems.map((item) => (
               <button
                 key={item.name}
                 type="button"
                 onClick={() => handleMenuChange(item.name)}
-                className="btn text-start border-0 rounded-3"
+                className="btn text-start border-0 py-3 px-3 d-flex align-items-center gap-3"
+                aria-current={
+                  activeMenu === item.name ? "page" : undefined
+                }
                 style={{
-                  backgroundColor:
+                  background:
                     activeMenu === item.name
-                      ? "#fff0f5"
+                      ? VENDOR_THEME.button
                       : "transparent",
-                  color:
-                    activeMenu === item.name
-                      ? "#fc2779"
-                      : "#555",
+
+                  color: "#FFFFFF",
+
                   fontWeight:
                     activeMenu === item.name ? "600" : "400",
+
+                  borderRadius: "14px",
+
+                  boxShadow:
+                    activeMenu === item.name
+                      ? "0 4px 12px rgba(217, 54, 32, 0.25)"
+                      : "none",
+
+                  transition: "all 0.2s ease",
                 }}
               >
-                <i className={`bi ${item.icon} me-2`}></i>
+                <i className={`bi ${item.icon} fs-5`}></i>
                 {item.name}
               </button>
             ))}
           </div>
 
           {/* LOGOUT */}
-          <div className="mt-md-auto mt-4">
+          <div className="mt-md-auto pt-4">
             <button
               type="button"
               onClick={handleLogout}
-              className="btn btn-outline-danger w-100"
+              className="btn btn-outline-light w-100 rounded-3"
             >
               <i className="bi bi-box-arrow-right me-2"></i>
               Logout
@@ -428,7 +551,41 @@ const handleBack = () => {
         <main className="col-12 col-md-9 col-lg-10 p-3 p-md-4">
 
           {/* TOP HEADER */}
-          <div className="d-flex justify-content-between align-items-center bg-white rounded-3 border p-3 mb-4">
+          <div
+            className="d-flex justify-content-between align-items-center bg-white position-relative overflow-hidden mb-4"
+            style={{
+              borderRadius: "22px",
+              border: `1px solid ${VENDOR_THEME.border}`,
+              boxShadow: VENDOR_THEME.shadow,
+              padding: "22px 24px 22px 32px",
+              minHeight: "100px",
+            }}
+          >
+            <svg
+              viewBox="0 0 65 120"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "55px",
+                height: "100%",
+                pointerEvents: "none",
+              }}
+            >
+              <path
+                d="M0 0 L5 0 C-5 60 10 110 65 120 L0 120 Z"
+                fill="#FF7355"
+                opacity="0.55"
+              />
+
+              <path
+                d="M0 0 L2 0 C-3 85 15 115 40 120 L0 120 Z"
+                fill="#FF7029"
+                opacity="0.8"
+              />
+            </svg>
           <div>
             <div className="d-flex align-items-center gap-2 mb-1">
               {activeMenu !== "Dashboard" && (
@@ -461,7 +618,7 @@ const handleBack = () => {
                 style={{
                   width: "38px",
                   height: "38px",
-                  backgroundColor: "#fc2779",
+                  background: VENDOR_THEME.button,
                 }}
               >
                 {user?.name?.charAt(0)?.toUpperCase() || "V"}
@@ -501,6 +658,7 @@ const handleBack = () => {
                 </p>
               </div>
 
+
               {/* OVERVIEW CARDS */}
               <div className="row g-3 mb-4">
                 {overviewCards.map((card) => (
@@ -508,25 +666,67 @@ const handleBack = () => {
                     className="col-6 col-xl-3"
                     key={card.title}
                   >
-                    <div className="card border-0 shadow-sm h-100 rounded-4">
-                      <div className="card-body p-3">
+                    <div
+                      className="card h-100 rounded-4 position-relative overflow-hidden"
+                      style={{
+                        background: `linear-gradient(145deg, #FFFFFF 65%, ${card.bg}55 100%)`,
+                        border: `1px solid ${card.bg}`,
+                        boxShadow: VENDOR_THEME.shadow,
+                        minHeight: "175px",
+                      }}
+                    >
+                      {/* Decorative bottom waves */}
+                      <svg
+                        viewBox="0 0 300 65"
+                        preserveAspectRatio="none"
+                        aria-hidden="true"
+                        style={{
+                          position: "absolute",
+                          bottom: 0,
+                          left: 0,
+                          width: "100%",
+                          height: "55px",
+                          pointerEvents: "none",
+                        }}
+                      >
+                        <path
+                          d="M0 65 C140 65 170 55 215 30 C250 10 275 8 300 0 L300 65 Z"
+                          fill={card.bg}
+                          opacity="0.8"
+                        />
+
+                        <path
+                          d="M0 65 C150 65 205 60 245 40 C270 27 285 25 300 20 L300 65 Z"
+                          fill={card.color}
+                          opacity="0.10"
+                        />
+                      </svg>
+
+                      {/* Card content */}
+                      <div
+                        className="card-body p-3 position-relative"
+                        style={{ zIndex: 1 }}
+                      >
                         <div
                           className="rounded-3 d-flex justify-content-center align-items-center mb-3"
                           style={{
-                            width: "45px",
-                            height: "45px",
+                            width: "48px",
+                            height: "48px",
                             backgroundColor: card.bg,
                             color: card.color,
                           }}
                         >
-                          <i className={`bi ${card.icon} fs-5`}></i>
+                          <i className={`bi ${card.icon} fs-4`}></i>
                         </div>
 
-                        <h3 className="fw-bold mb-1">
+                        <h3
+                          className="fw-bold mb-1 text-center"
+                          style={{ color: VENDOR_THEME.text }}
+                        >
                           {loading ? "..." : card.count}
                         </h3>
 
-                        <p className="text-secondary small mb-0">
+                        <p className="text-secondary small mb-0 text-center">
                           {card.title}
                         </p>
                       </div>
@@ -544,7 +744,15 @@ const handleBack = () => {
                   <button
                     type="button"
                     className="btn text-white me-2 mb-2"
-                    style={{ backgroundColor: "#fc2779" }}
+                    style={{
+                      background: VENDOR_THEME.button,
+                      color: "#FFFFFF",
+                      border: "none",
+                      borderRadius: "12px",
+                      padding: "12px 22px",
+                      fontWeight: "500",
+                      boxShadow: "0 4px 10px rgba(217, 54, 32, 0.18)",
+                    }}
                     onClick={() => handleMenuChange("Add Product")}
                     >
                     <i className="bi bi-plus-circle me-2"></i>
@@ -554,7 +762,15 @@ const handleBack = () => {
                   <button
                     type="button"
                     className="btn text-white me-2 mb-2"
-                    style={{ backgroundColor: "#fc2779" }}
+                    style={{
+                      background: VENDOR_THEME.button,
+                      color: "#FFFFFF",
+                      border: "none",
+                      borderRadius: "12px",
+                      padding: "12px 22px",
+                      fontWeight: "500",
+                      boxShadow: "0 4px 10px rgba(217, 54, 32, 0.18)",
+                    }}
                     onClick={() => handleMenuChange("My Products")}
                   >
                     <i className="bi bi-bag-fill me-2"></i>
@@ -564,6 +780,14 @@ const handleBack = () => {
                   <button
                     type="button"
                     className="btn btn-outline-secondary mb-2"
+                    style={{
+                      backgroundColor: "#FFFFFF",
+                      color: VENDOR_THEME.primary,
+                      border: `1px solid ${VENDOR_THEME.primary}`,
+                      borderRadius: "12px",
+                      padding: "12px 22px",
+                      fontWeight: "500",
+                    }}
                     onClick={fetchMyProducts}
                   >
                     <i className="bi bi-arrow-clockwise me-2"></i>
@@ -673,7 +897,7 @@ const handleBack = () => {
                 <div className="text-center py-5">
                   <div
                     className="spinner-border"
-                    style={{ color: "#fc2779" }}
+                    style={{ color: "#C94B32" }}
                     role="status"
                   >
                     <span className="visually-hidden">

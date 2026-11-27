@@ -474,8 +474,9 @@ function EditProduct({ product, onClose, onUpdated }) {
       }}
     >
       <div
-        className="bg-white rounded-4 shadow p-4 w-100"
+        className="rounded-4 shadow p-3 p-md-4 w-100"
         style={{
+          backgroundColor: "#FFF8F4",
           maxWidth: "800px",
           maxHeight: "90vh",
           overflowY: "auto"
@@ -483,10 +484,37 @@ function EditProduct({ product, onClose, onUpdated }) {
       >
 
         {/* Modal Header */}
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h5 className="fw-bold mb-0">
-            Edit Product
-          </h5>
+        <div
+          className="d-flex justify-content-between align-items-center rounded-3 p-3 mb-4"
+          style={{
+            background: "linear-gradient(135deg, #FFF1EB, #FFE2D5)",
+            border: "1px solid #F4DCD3",
+          }}
+        >
+          <div className="d-flex align-items-center gap-3">
+            <div
+              className="rounded-3 p-3 text-white flex-shrink-0"
+             style={{
+              background: "linear-gradient(180deg, #E65A20, #D93620)",
+              boxShadow: "0 4px 10px rgba(217,54,32,0.18)",
+            }}
+            >
+              <i className="bi bi-pencil-square fs-4"></i>
+            </div>
+
+            <div>
+              <h5
+                className="fw-bold mb-1"
+                style={{ color: "#2D202E" }}
+              >
+                Edit Product
+              </h5>
+
+              <p className="text-secondary small mb-0">
+                Update product details and inventory
+              </p>
+            </div>
+          </div>
 
           <button
             type="button"
@@ -504,7 +532,7 @@ function EditProduct({ product, onClose, onUpdated }) {
           </div>
         )}
 
-        <form onSubmit={handleUpdateProduct}>
+        <form onSubmit={handleUpdateProduct} className="text-start">
 
           {/* Product Name */}
           <div className="mb-3">
@@ -515,7 +543,7 @@ function EditProduct({ product, onClose, onUpdated }) {
             <input
               type="text"
               name="productName"
-              className="form-control"
+              className="form-control rounded-3 py-2"
               value={editForm.productName}
               onChange={handleEditChange}
               required
@@ -530,7 +558,7 @@ function EditProduct({ product, onClose, onUpdated }) {
 
             <textarea
               name="description"
-              className="form-control"
+              className="form-control rounded-3 py-2"
               rows="3"
               value={editForm.description}
               onChange={handleEditChange}
@@ -547,7 +575,7 @@ function EditProduct({ product, onClose, onUpdated }) {
 
               <select
                 name="category"
-                className="form-select"
+                className="form-select rounded-3 py-2"
                 value={editForm.category}
                 onChange={handleEditChange}
                 required
@@ -565,7 +593,7 @@ function EditProduct({ product, onClose, onUpdated }) {
               <input
                 type="text"
                 name="subCategory"
-                className="form-control"
+                className="form-control rounded-3 py-2"
                 value={editForm.subCategory}
                 onChange={handleEditChange}
               />
@@ -582,7 +610,7 @@ function EditProduct({ product, onClose, onUpdated }) {
             <input
               type="text"
               name="brand"
-              className="form-control"
+              className="form-control rounded-3 py-2"
               value={editForm.brand}
               onChange={handleEditChange}
             />
@@ -599,7 +627,7 @@ function EditProduct({ product, onClose, onUpdated }) {
               <input
                 type="number"
                 name="price"
-                className="form-control"
+                className="form-control rounded-3 py-2"
                 min="0"
                 step="0.01"
                 value={editForm.price}
@@ -616,7 +644,7 @@ function EditProduct({ product, onClose, onUpdated }) {
               <input
                 type="number"
                 name="discountPrice"
-                className="form-control"
+                className="form-control rounded-3 py-2"
                 min="0"
                 step="0.01"
                 value={editForm.discountPrice}
@@ -704,22 +732,42 @@ function EditProduct({ product, onClose, onUpdated }) {
 
           {/* Stock Summary for Variant Products */}
           {!isLegacyProduct && (
-            <div className="border rounded p-3 mb-4">
+            <div
+              className="rounded-3 p-3 mb-4"
+              style={{
+                backgroundColor: "#FFFFFF",
+                border: "1px solid #F4DCD3"
+              }}
+            >
+              <h6
+                className="fw-bold mb-3"
+                style={{ color: "#2D202E" }}
+              >
+                <i className="bi bi-boxes me-2"></i>
+                Stock Summary
+              </h6>
 
-              <div className="d-flex justify-content-between">
-                <span>Previous Total Stock:</span>
+              <div className="d-flex justify-content-between mb-2">
+                <span className="text-secondary">
+                  Previous Total Stock:
+                </span>
                 <strong>{originalStock}</strong>
               </div>
 
-              <div className="d-flex justify-content-between">
-                <span>Updated Total Stock:</span>
-                <strong style={{ color: "#fc2779" }}>
+              <div className="d-flex justify-content-between mb-2">
+                <span className="text-secondary">
+                  Updated Total Stock:
+                </span>
+
+                <strong style={{ color: "#D93620" }}>
                   {totalStock}
                 </strong>
               </div>
 
+              <hr style={{ borderColor: "#F4DCD3" }} />
+
               <div className="d-flex justify-content-between">
-                <span>Stock Change:</span>
+                <span className="fw-semibold">Stock Change:</span>
 
                 <strong
                   className={
@@ -734,7 +782,6 @@ function EditProduct({ product, onClose, onUpdated }) {
                   {totalStock - originalStock}
                 </strong>
               </div>
-
             </div>
           )}
 
@@ -788,22 +835,30 @@ function EditProduct({ product, onClose, onUpdated }) {
           )}
 
           {/* Form Buttons */}
-          <div className="d-flex justify-content-end gap-2">
+          <div className="d-flex justify-content-end flex-wrap gap-2">
 
             <button
               type="button"
-              className="btn btn-outline-secondary"
+              className="btn fw-semibold rounded-3 px-4 py-2"
+              style={{
+                backgroundColor: "#FFFFFF",
+                color: "#D93620",
+                border: "1px solid #D93620",
+              }}
               onClick={onClose}
               disabled={updating || reloading}
             >
               Cancel
             </button>
 
-            {/* Disable saving during conflict or reloading */}
             <button
               type="submit"
-              className="btn text-white"
-              style={{ backgroundColor: "#fc2779" }}
+              className="btn text-white fw-semibold rounded-3 px-4 py-2"
+              style={{
+                background: "linear-gradient(180deg, #E65A20, #D93620)",
+                border: "none",
+                boxShadow: "0 4px 10px rgba(217,54,32,0.18)",
+              }}
               disabled={
                 updating ||
                 reloading ||
@@ -811,6 +866,8 @@ function EditProduct({ product, onClose, onUpdated }) {
                 originalVersion === null
               }
             >
+              <i className="bi bi-check-circle me-2"></i>
+
               {updating
                 ? "Saving..."
                 : versionConflict

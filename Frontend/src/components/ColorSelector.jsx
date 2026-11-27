@@ -21,14 +21,17 @@ function ColorSelector({ selectedColors = [], onChange }) {
       )
       .map((color) => ({
         name: color,
-        hex: "#E9ECEF"
-      }))
+        hex: "#E9ECEF",
+      })),
   ];
 
   return (
-    <div className="col-12">
+    <div className="col-12 text-start">
 
-      <label className="form-label fw-semibold">
+      <label
+        className="form-label fw-semibold"
+        style={{ color: "#2D202E" }}
+      >
         Available Colours *
       </label>
 
@@ -43,20 +46,32 @@ function ColorSelector({ selectedColors = [], onChange }) {
               type="button"
               aria-pressed={isSelected}
               onClick={() => handleColorToggle(color.name)}
-              className="btn btn-sm d-flex flex-column align-items-center justify-content-center gap-2 p-2"
+              className="btn btn-sm position-relative d-flex flex-column align-items-center justify-content-center gap-2 p-2"
               style={{
                 width: "90px",
                 minHeight: "80px",
                 border: isSelected
-                  ? "2px solid #fc2779"
-                  : "2px solid #dee2e6",
+                  ? "2px solid #D93620"
+                  : "2px solid #F4DCD3",
                 backgroundColor: isSelected
-                  ? "#fff0f6"
-                  : "#ffffff",
-                borderRadius: "8px",
-                color: "#333333"
+                  ? "#FFF1EB"
+                  : "#FFFFFF",
+                borderRadius: "10px",
+                color: "#2D202E",
+                transition: "all 0.2s ease",
               }}
             >
+
+              {/* Selected colour indicator */}
+              {isSelected && (
+                <i
+                  className="bi bi-check-circle-fill position-absolute top-0 end-0 me-1 mt-1"
+                  style={{
+                    color: "#D93620",
+                    fontSize: "14px",
+                  }}
+                ></i>
+              )}
 
               {/* Colour swatch */}
               <span
@@ -65,13 +80,18 @@ function ColorSelector({ selectedColors = [], onChange }) {
                   height: "30px",
                   borderRadius: "50%",
                   background: color.hex,
-                  border: "1px solid #ced4da",
-                  display: "inline-block"
+                  border: "1px solid #CED4DA",
+                  display: "inline-block",
                 }}
               />
 
               {/* Colour name */}
-              <span style={{ fontSize: "12px" }}>
+              <span
+                style={{
+                  fontSize: "12px",
+                  fontWeight: isSelected ? "600" : "400",
+                }}
+              >
                 {color.name}
               </span>
 
@@ -82,8 +102,17 @@ function ColorSelector({ selectedColors = [], onChange }) {
       </div>
 
       {/* Selected colours */}
-      <div className="small text-secondary mt-2">
-        Selected Colours:{" "}
+      <div
+        className="small mt-3 rounded-3 p-2"
+        style={{
+          backgroundColor: "#FFF1EB",
+          color: "#2D202E",
+        }}
+      >
+        <span className="fw-semibold">
+          Selected Colours:
+        </span>{" "}
+
         {selectedColors.length > 0
           ? selectedColors.join(", ")
           : "None"}
