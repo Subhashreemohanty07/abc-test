@@ -1,4 +1,3 @@
-
 import {
   useCallback,
   useEffect,
@@ -6,7 +5,11 @@ import {
   useState,
 } from "react";
 
-import { Link, useNavigate } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
@@ -15,13 +18,23 @@ import { COLOR_OPTIONS } from "../constants/productOptions";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+// SABKOO CUSTOMER THEME
+const THEME = {
+  primary: "#07868B",
+  primaryDark: "#084F55",
+  light: "#EAF7F7",
+  border: "#B9DFE0",
+  background: "#F8F9FA",
+};
+
 // NORMALIZE PRODUCT OPTIONS
 function normalizeOptions(value) {
   return [
     ...new Set(
-      (Array.isArray(value)
-        ? value
-        : String(value || "").split(",")
+      (
+        Array.isArray(value)
+          ? value
+          : String(value || "").split(",")
       )
         .map((item) => String(item).trim())
         .filter(Boolean)
@@ -32,7 +45,7 @@ function normalizeOptions(value) {
 // CHECK VARIANT INVENTORY
 function hasVariantInventory(product) {
   return (
-    Array.isArray(product.variants) &&
+    Array.isArray(product?.variants) &&
     product.variants.length > 0
   );
 }
@@ -113,12 +126,14 @@ function getMaximumQuantity(item, cartItems) {
         return total;
       }
 
-      // Only count matching variants
+      // ONLY COUNT MATCHING VARIANTS
       if (
         hasVariants &&
         (
-          (otherItem.size || "") !== (item.size || "") ||
-          (otherItem.color || "") !== (item.color || "")
+          (otherItem.size || "") !==
+            (item.size || "") ||
+          (otherItem.color || "") !==
+            (item.color || "")
         )
       ) {
         return total;
@@ -163,45 +178,185 @@ function getColorHex(colorName) {
   return color?.hex || "#E9ECEF";
 }
 
+// GET SELECTED COLOUR'S PRIMARY IMAGE
+function getProductImage(product, selectedColor) {
+  const allImages = Array.isArray(product?.images)
+    ? product.images.filter((image) => image?.url)
+    : [];
+
+  const normalizeColor = (color) =>
+    String(color || "").trim().toLowerCase();
+
+  const matchingImages = allImages.filter(
+    (image) =>
+      normalizeColor(image.color) ===
+      normalizeColor(selectedColor)
+  );
+
+  const legacyImages = allImages.filter(
+    (image) => !normalizeColor(image.color)
+  );
+
+  const selectedImages = selectedColor
+    ? matchingImages.length > 0
+      ? matchingImages
+      : legacyImages
+    : allImages;
+
+  const sortedImages = [...selectedImages].sort(
+    (a, b) =>
+      Number(Boolean(b.isPrimary)) -
+        Number(Boolean(a.isPrimary)) ||
+      Number(a.sortOrder ?? 0) -
+        Number(b.sortOrder ?? 0)
+  );
+
+  return (
+    sortedImages[0]?.url ||
+    "https://placehold.co/100x120?text=Product"
+  );
+}
+
+// GET PRODUCT SELLING PRICE
+function getProductPrice(product) {
+  return Number(
+    product?.discountPrice ??
+    product?.price ??
+    0
+  );
+}
+
+// CALCULATE SUBTOTAL
+function calculateSubtotal(items) {
+  return items.reduce(
+    (total, item) =>
+      total +
+      getProductPrice(item.product) *
+        Number(item.quantity || 0),
+    0
+  );
+}
+
+// CHECK WHETHER CHECKOUT ITEMS OR PRICES CHANGED
+function getCheckoutSignature(items) {
+  return JSON.stringify(
+    items
+      .map((item) => ({
+        id: String(item._id),
+        product: String(item.product?._id),
+        size: item.size || "",
+        color: item.color || "",
+        quantity: Number(item.quantity),
+        price: getProductPrice(item.product),
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id))
+  );
+}
+
 function Checkout() {
   const navigate = useNavigate();
 
-  // CART
+  const [searchParams] = useSearchParams();
+
+  // =====================================
+  // CHECKOUT MODE
+  // =====================================
+
+  const checkoutMode =
+    searchParams.get("mode") || "cart";
+
+  const isBuyNow = checkoutMode === "buyNow";
+
+  const buyNowProductId =
+    searchParams.get("productId") || "";
+
+  const buyNowQuantity = Number(
+    searchParams.get("quantity")
+  );
+
+  const buyNowSize =
+    searchParams.get("size") || "";
+
+  const buyNowColor =
+    searchParams.get("color") || "";
+
+  const returnPath = isBuyNow && buyNowProductId
+    ? `/products/${encodeURIComponent(buyNowProductId)}`
+    : "/cart";
+
+  const returnLabel = isBuyNow
+    ? "Return to Product"
+    : "Return to Shopping Bag";
+
+  // =====================================
+  // CHECKOUT ITEMS
+  // =====================================
+
   const [cartItems, setCartItems] = useState([]);
-  const [cartLoading, setCartLoading] = useState(true);
-  const [cartError, setCartError] = useState("");
+
+  const [cartLoading, setCartLoading] =
+    useState(true);
+
+  const [cartError, setCartError] =
+    useState("");
 
   // DELIVERY ADDRESSES
-  const [savedAddresses, setSavedAddresses] = useState([]);
-  const [selectedAddressId, setSelectedAddressId] = useState("");
-  const [addressReady, setAddressReady] = useState(false);
-  const [addressError, setAddressError] = useState("");
+  const [savedAddresses, setSavedAddresses] =
+    useState([]);
+
+  const [
+    selectedAddressId,
+    setSelectedAddressId,
+  ] = useState("");
+
+  const [addressReady, setAddressReady] =
+    useState(false);
+
+  const [addressError, setAddressError] =
+    useState("");
 
   // PAYMENT
-  const [paymentMethod, setPaymentMethod] = useState("COD");
+  const [paymentMethod, setPaymentMethod] =
+    useState("COD");
 
   // ORDER
-  const [placingOrder, setPlacingOrder] = useState(false);
-  const [orderError, setOrderError] = useState("");
-  const [orderUncertain, setOrderUncertain] = useState(false);
+  const [placingOrder, setPlacingOrder] =
+    useState(false);
+
+  const [orderError, setOrderError] =
+    useState("");
+
+  const [orderUncertain, setOrderUncertain] =
+    useState(false);
 
   // PREVENT RAPID DUPLICATE SUBMISSIONS
   const orderInProgress = useRef(false);
 
+  // =====================================
   // HANDLE EXPIRED LOGIN
+  // =====================================
+
   const handleUnauthorized = useCallback(() => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
 
-    window.dispatchEvent(new Event("authUpdated"));
+    window.dispatchEvent(
+      new Event("authUpdated")
+    );
 
     navigate("/signin", {
       replace: true,
-      state: { from: "/checkout" },
+
+      state: {
+        from: `/checkout${window.location.search}`,
+      },
     });
   }, [navigate]);
 
-  // FETCH LATEST CART
+  // =====================================
+  // FETCH CART OR BUY NOW PRODUCT
+  // =====================================
+
   const fetchCart = useCallback(
     async (signal, silent = false) => {
       const token = localStorage.getItem("token");
@@ -218,40 +373,137 @@ function Checkout() {
 
         setCartError("");
 
-        const response = await fetch(
-          `${API_URL}/api/cart`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            signal,
-            cache: "no-store",
-          }
-        );
+        if (
+          !["cart", "buyNow"].includes(checkoutMode)
+        ) {
+          throw new Error("Invalid checkout mode.");
+        }
 
-        const data = await response.json();
+        let items = [];
+
+        // =====================================
+        // BUY NOW CHECKOUT
+        // =====================================
+
+        if (isBuyNow) {
+          if (
+            !/^[a-fA-F0-9]{24}$/.test(
+              buyNowProductId
+            ) ||
+            !Number.isSafeInteger(buyNowQuantity) ||
+            buyNowQuantity < 1
+          ) {
+            throw new Error(
+              "Invalid Buy Now product details."
+            );
+          }
+
+          const response = await fetch(
+            `${API_URL}/api/products/${encodeURIComponent(
+              buyNowProductId
+            )}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+
+              signal,
+              cache: "no-store",
+            }
+          );
+
+          const data = await response.json();
+
+          if (signal?.aborted) return null;
+
+          if (response.status === 401) {
+            handleUnauthorized();
+            return null;
+          }
+
+          if (!response.ok) {
+            throw new Error(
+              data.message ||
+              "Failed to load selected product."
+            );
+          }
+
+          const product =
+            data.product || data.data || data;
+
+          if (
+            !product?._id ||
+            String(product._id) !== buyNowProductId
+          ) {
+            throw new Error("Product not found.");
+          }
+
+          // CREATE TEMPORARY CHECKOUT ITEM
+          // NOTHING IS SAVED TO MONGODB CART
+
+          items = [
+            {
+              _id: `buy-now-${product._id}`,
+
+              product,
+
+              quantity: buyNowQuantity,
+              size: buyNowSize,
+              color: buyNowColor,
+            },
+          ];
+        }
+
+        // =====================================
+        // NORMAL CART CHECKOUT
+        // =====================================
+
+        else {
+          const response = await fetch(
+            `${API_URL}/api/cart`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+
+              signal,
+              cache: "no-store",
+            }
+          );
+
+          const data = await response.json();
+
+          if (signal?.aborted) return null;
+
+          if (response.status === 401) {
+            handleUnauthorized();
+            return null;
+          }
+
+          if (!response.ok) {
+            throw new Error(
+              data.message || "Failed to load cart."
+            );
+          }
+
+          items = Array.isArray(data.items)
+            ? data.items
+            : [];
+        }
 
         if (signal?.aborted) return null;
 
-        if (response.status === 401) {
-          handleUnauthorized();
-          return null;
-        }
-
-        if (!response.ok) {
-          throw new Error(
-            data.message || "Failed to load cart."
-          );
-        }
-
-        const items = Array.isArray(data.items)
-          ? data.items
-          : [];
-
         setCartItems(items);
 
-        if (items.length === 0 && !silent) {
-          navigate("/cart", { replace: true });
+        // REDIRECT ONLY FOR EMPTY NORMAL CART
+        if (
+          !isBuyNow &&
+          items.length === 0 &&
+          !silent
+        ) {
+          navigate("/cart", {
+            replace: true,
+          });
         }
 
         return items;
@@ -261,8 +513,11 @@ function Checkout() {
           error.name !== "AbortError" &&
           !signal?.aborted
         ) {
+          setCartItems([]);
+
           setCartError(
-            error.message || "Unable to load cart."
+            error.message ||
+            "Unable to load checkout details."
           );
         }
 
@@ -274,19 +529,35 @@ function Checkout() {
         }
       }
     },
-    [navigate, handleUnauthorized]
+
+    [
+      navigate,
+      handleUnauthorized,
+      checkoutMode,
+      isBuyNow,
+      buyNowProductId,
+      buyNowQuantity,
+      buyNowSize,
+      buyNowColor,
+    ]
   );
 
-  // INITIAL CART FETCH
+  // INITIAL CHECKOUT FETCH
   useEffect(() => {
     const controller = new AbortController();
+
+    setOrderError("");
 
     fetchCart(controller.signal);
 
     return () => controller.abort();
+
   }, [fetchCart]);
 
-  // RECEIVE ADDRESSES
+  // =====================================
+  // DELIVERY ADDRESS FUNCTIONS
+  // =====================================
+
   const handleAddressesChange = useCallback(
     (updatedAddresses) => {
       setSavedAddresses(
@@ -301,24 +572,16 @@ function Checkout() {
     []
   );
 
-  // SELECT ADDRESS
-  const handleSelectAddress = useCallback((id) => {
-    setSelectedAddressId(id);
-    setAddressError("");
-  }, []);
+  const handleSelectAddress = useCallback(
+    (id) => {
+      setSelectedAddressId(id);
+      setAddressError("");
+    },
+    []
+  );
 
-  // CART SUBTOTAL
-  const subtotal = cartItems.reduce((total, item) => {
-    const product = item.product || {};
-
-    const price = Number(
-      product.discountPrice ?? product.price ?? 0
-    );
-
-    const quantity = Number(item.quantity || 0);
-
-    return total + price * quantity;
-  }, 0);
+  // CHECKOUT SUBTOTAL
+  const subtotal = calculateSubtotal(cartItems);
 
   // TOTAL ITEMS
   const totalItems = cartItems.reduce(
@@ -332,17 +595,22 @@ function Checkout() {
     (item) => item._id === selectedAddressId
   );
 
-  // CHECK ALL CART ITEMS
+  // CHECK STOCK
   const hasStockIssues = cartItems.some(
-    (item) => hasInsufficientStock(item, cartItems)
+    (item) =>
+      hasInsufficientStock(item, cartItems)
   );
 
+  // =====================================
   // PLACE ORDER
+  // =====================================
+
   async function handlePlaceOrder() {
     if (
       orderInProgress.current ||
       placingOrder ||
       cartLoading ||
+      cartError ||
       orderUncertain
     ) {
       return;
@@ -356,6 +624,7 @@ function Checkout() {
       setAddressError(
         "Please select a delivery address."
       );
+
       return;
     }
 
@@ -364,20 +633,29 @@ function Checkout() {
       setOrderError(
         "Please select a valid payment method."
       );
+
       return;
     }
 
-    // VALIDATE CART
+    // VALIDATE CHECKOUT ITEMS
     if (cartItems.length === 0) {
-      setOrderError("Your shopping bag is empty.");
+      setOrderError(
+        isBuyNow
+          ? "No product selected for checkout."
+          : "Your shopping bag is empty."
+      );
+
       return;
     }
 
     // VALIDATE CURRENT STOCK
     if (hasStockIssues) {
       setOrderError(
-        "Some products have insufficient stock. Please update your shopping bag."
+        isBuyNow
+          ? "The selected product or quantity is unavailable. Please return to the product page."
+          : "Some products have insufficient stock. Please update your shopping bag."
       );
+
       return;
     }
 
@@ -390,13 +668,14 @@ function Checkout() {
 
     // LOCK ORDER SUBMISSION
     orderInProgress.current = true;
+
     setPlacingOrder(true);
 
     let orderRequestSent = false;
     let definitiveResponse = false;
 
     try {
-      // FETCH LATEST INVENTORY BEFORE PLACING ORDER
+      // FETCH LATEST INVENTORY
       const latestItems = await fetchCart(
         undefined,
         true
@@ -404,13 +683,19 @@ function Checkout() {
 
       if (!latestItems) {
         setOrderError(
-          "Unable to verify your latest cart. Please try again."
+          "Unable to verify your latest checkout details. Please try again."
         );
+
         return;
       }
 
       if (latestItems.length === 0) {
-        setOrderError("Your shopping bag is empty.");
+        setOrderError(
+          isBuyNow
+            ? "Selected product is unavailable."
+            : "Your shopping bag is empty."
+        );
+
         return;
       }
 
@@ -422,65 +707,84 @@ function Checkout() {
 
       if (latestStockIssues) {
         setOrderError(
-          "Product availability has changed. Please return to your cart and update the quantities."
+          isBuyNow
+            ? "Product availability has changed. Please return to the product page and select an available quantity."
+            : "Product availability has changed. Please return to your cart and update the quantities."
         );
+
         return;
       }
 
       // CALCULATE LATEST TOTAL
-      const latestSubtotal = latestItems.reduce(
-        (total, item) => {
-          const product = item.product || {};
-
-          const price = Number(
-            product.discountPrice ??
-            product.price ??
-            0
-          );
-
-          return total + price * Number(item.quantity);
-        },
-        0
-      );
-
-      // CHECK WHETHER CART CONTENTS OR PRICES CHANGED
-      const cartSignature = (items) =>
-        JSON.stringify(
-          items.map((item) => ({
-            id: String(item._id),
-            product: String(item.product?._id),
-            size: item.size || "",
-            color: item.color || "",
-            quantity: Number(item.quantity),
-            price: Number(
-              item.product?.discountPrice ??
-              item.product?.price ??
-              0
-            ),
-          })).sort((a, b) => a.id.localeCompare(b.id))
-        );
+      const latestSubtotal =
+        calculateSubtotal(latestItems);
 
       if (
-        cartSignature(latestItems) !==
-        cartSignature(cartItems)
+        !Number.isFinite(latestSubtotal) ||
+        latestSubtotal < 0 ||
+        latestItems.some(
+          (item) =>
+            !Number.isFinite(
+              getProductPrice(item.product)
+            ) ||
+            getProductPrice(item.product) < 0
+        )
+      ) {
+        setOrderError("Invalid order amount.");
+        return;
+      }
+
+      // CHECK PRODUCT DETAILS AND PRICE CHANGES
+      if (
+        getCheckoutSignature(latestItems) !==
+        getCheckoutSignature(cartItems)
       ) {
         setOrderError(
-          "Your cart or product prices have changed. Please review the updated order summary before placing your order."
+          "Product details or prices have changed. Please review the updated order summary before placing your order."
         );
+
         return;
       }
 
       // COD CONFIRMATION
       const confirmed = window.confirm(
         "Confirm your Cash on Delivery order?\n\n" +
-        `Total Amount: ₹${latestSubtotal.toLocaleString("en-IN")}\n\n` +
+        `Total Amount: ₹${latestSubtotal.toLocaleString(
+          "en-IN"
+        )}\n\n` +
         "You will pay when your order is delivered.\n\n" +
         "Click OK to place your order."
       );
 
       if (!confirmed) return;
 
+      // =====================================
+      // PREPARE ORDER REQUEST
+      // =====================================
+
+      const orderPayload = {
+        addressId: selectedAddress._id,
+        paymentMethod: "COD",
+
+        checkoutMode: isBuyNow
+          ? "buyNow"
+          : "cart",
+      };
+
+      // SEND SELECTED PRODUCT ONLY FOR BUY NOW
+      if (isBuyNow) {
+        orderPayload.buyNowItem = {
+          productId: buyNowProductId,
+          quantity: buyNowQuantity,
+          size: buyNowSize,
+          color: buyNowColor,
+        };
+      }
+
+      // =====================================
       // CALL ORDER API
+      // =====================================
+
       orderRequestSent = true;
 
       const response = await fetch(
@@ -490,19 +794,19 @@ function Checkout() {
 
           headers: {
             "Content-Type": "application/json",
+
             Authorization: `Bearer ${token}`,
           },
 
-          body: JSON.stringify({
-            addressId: selectedAddress._id,
-            paymentMethod: "COD",
-          }),
+          body: JSON.stringify(orderPayload),
         }
       );
 
       if (response.status === 401) {
         definitiveResponse = true;
+
         handleUnauthorized();
+
         return;
       }
 
@@ -519,10 +823,11 @@ function Checkout() {
         definitiveResponse = true;
 
         setOrderError(
-          data.message || "Unable to place order."
+          data.message ||
+          "Unable to place order."
         );
 
-        // REFRESH CART AND STOCK INFORMATION
+        // REFRESH STOCK INFORMATION
         if (
           response.status === 400 ||
           response.status === 409
@@ -541,32 +846,43 @@ function Checkout() {
 
       definitiveResponse = true;
 
-      // CLEAR LOCAL CART
+      // CLEAR LOCAL CHECKOUT ITEMS
       setCartItems([]);
 
       // UPDATE NAVBAR CART COUNT
-      window.dispatchEvent(
-        new Event("cartUpdated")
-      );
+      // ONLY FOR NORMAL CART CHECKOUT
+      if (!isBuyNow) {
+        window.dispatchEvent(
+          new Event("cartUpdated")
+        );
+      }
 
-      // NAVIGATE TO SUCCESS PAGE
+      // NAVIGATE TO ORDER SUCCESS
       navigate("/order-success", {
         replace: true,
+
         state: {
           order: data.order,
         },
       });
 
     } catch (error) {
-      console.error("Place order error:", error);
+      console.error(
+        "Place order error:",
+        error
+      );
 
       // NETWORK FAILURE AFTER ORDER REQUEST
-      if (orderRequestSent && !definitiveResponse) {
+      if (
+        orderRequestSent &&
+        !definitiveResponse
+      ) {
         setOrderUncertain(true);
 
         setOrderError(
           "We could not confirm your order status. Please check your order history before attempting to place another order."
         );
+
       } else {
         setOrderError(
           error.message ||
@@ -576,68 +892,97 @@ function Checkout() {
 
     } finally {
       orderInProgress.current = false;
+
       setPlacingOrder(false);
     }
   }
 
+  // =====================================
+  // CHECKOUT UI
+  // =====================================
+
   return (
-    <div className="bg-light min-vh-100">
+    <div className="bg-light min-vh-100 w-100">
 
       <Navbar />
 
-      <main
-        className="container pb-5"
-        style={{ paddingTop: "190px" }}
-      >
+      <main className="container pt-3 pt-lg-4 pb-5">
 
         {/* BREADCRUMB */}
         <nav aria-label="breadcrumb">
+
           <ol className="breadcrumb small">
 
             <li className="breadcrumb-item">
+
               <Link
                 to="/"
                 className="text-secondary text-decoration-none"
               >
                 Home
               </Link>
+
             </li>
 
             <li className="breadcrumb-item">
+
               <Link
-                to="/cart"
+                to={returnPath}
                 className="text-secondary text-decoration-none"
               >
-                Cart
+                {isBuyNow ? "Product" : "Cart"}
               </Link>
+
             </li>
 
-            <li className="breadcrumb-item active">
+            <li
+              className="breadcrumb-item active"
+              aria-current="page"
+            >
               Checkout
             </li>
 
           </ol>
+
         </nav>
 
         {/* PAGE HEADING */}
-        <div className="mb-4">
+        <div className="mb-4 text-center">
 
           <h2
             className="fw-bold"
-            style={{ color: "#f3338f" }}
+            style={{
+              color: THEME.primary,
+            }}
           >
             Checkout
           </h2>
 
-          <p className="text-secondary">
+          <p className="text-secondary mb-2">
             Select your delivery address to continue.
           </p>
+
+          {/* BUY NOW INFORMATION */}
+          {isBuyNow && (
+            <span
+              className="badge rounded-pill px-3 py-2"
+              style={{
+                backgroundColor: THEME.light,
+                color: THEME.primaryDark,
+                border: `1px solid ${THEME.border}`,
+              }}
+            >
+              <i className="bi bi-lightning-charge me-1"></i>
+
+              Direct Purchase
+            </span>
+          )}
 
         </div>
 
         {/* STOCK WARNING */}
         {!cartLoading && hasStockIssues && (
-          <div className="alert alert-warning">
+          <div className="alert alert-warning text-start">
 
             <h6 className="fw-bold">
 
@@ -648,29 +993,31 @@ function Checkout() {
             </h6>
 
             <p className="mb-2">
-              Some items in your shopping bag have
-              insufficient stock. Please update your
-              quantities before placing an order.
+              {isBuyNow
+                ? "The selected product or quantity is unavailable. Please update your selection."
+                : "Some items in your shopping bag have insufficient stock. Please update your quantities before placing an order."}
             </p>
 
             <Link
-              to="/cart"
+              to={returnPath}
               className="btn btn-sm btn-outline-dark"
             >
-              Update Shopping Bag
+              {returnLabel}
             </Link>
 
           </div>
         )}
 
-        {/* LOADING CART */}
+        {/* LOADING STATE */}
         {cartLoading ? (
 
           <div className="bg-white border rounded-3 text-center p-5">
 
             <div
               className="spinner-border"
-              style={{ color: "#fc2779" }}
+              style={{
+                color: THEME.primary,
+              }}
               role="status"
             >
               <span className="visually-hidden">
@@ -686,24 +1033,59 @@ function Checkout() {
 
         ) : cartError ? (
 
+          /* ERROR STATE */
           <div className="alert alert-danger">
 
-            <p className="mb-2">{cartError}</p>
+            <p className="mb-3">
+              {cartError}
+            </p>
 
-            <button
-              type="button"
-              className="btn btn-outline-danger me-2"
-              onClick={() => fetchCart()}
-              disabled={placingOrder}
-            >
-              Retry
-            </button>
+            <div className="d-flex flex-wrap justify-content-center gap-2">
+
+              <button
+                type="button"
+                className="btn btn-outline-danger"
+                onClick={() => fetchCart()}
+                disabled={placingOrder}
+              >
+                Retry
+              </button>
+
+              <Link
+                to={returnPath}
+                className="btn btn-outline-dark"
+              >
+                {returnLabel}
+              </Link>
+
+            </div>
+
+          </div>
+
+        ) : cartItems.length === 0 ? (
+
+          /* EMPTY CHECKOUT */
+          <div className="bg-white border rounded-3 text-center p-5">
+
+            <i
+              className="bi bi-bag-x display-4"
+              style={{
+                color: THEME.primary,
+              }}
+            ></i>
+
+            <h5 className="fw-bold mt-3">
+              No items available for checkout
+            </h5>
 
             <Link
-              to="/cart"
-              className="btn btn-outline-dark"
+              to={returnPath}
+              className="btn text-white mt-3"
+              style={{
+                backgroundColor: THEME.primary,
+              }}
             >
-              Back to Cart
+              {returnLabel}
             </Link>
 
           </div>
@@ -712,30 +1094,43 @@ function Checkout() {
 
           <div className="row g-4">
 
+            {/* ===================================== */}
             {/* LEFT SIDE */}
-            <div className="col-lg-8">
+            {/* ===================================== */}
+
+            <div className="col-12 col-lg-8">
 
               {/* DELIVERY ADDRESS */}
               <fieldset
                 disabled={placingOrder}
                 className="mb-4"
               >
+
                 <AddressManager
                   mode="checkout"
-                  selectedAddressId={selectedAddressId}
-                  onSelectAddress={handleSelectAddress}
-                  onAddressesChange={handleAddressesChange}
+                  selectedAddressId={
+                    selectedAddressId
+                  }
+                  onSelectAddress={
+                    handleSelectAddress
+                  }
+                  onAddressesChange={
+                    handleAddressesChange
+                  }
                 />
+
               </fieldset>
 
               {/* PAYMENT METHOD */}
-              <div className="bg-white border rounded-3 p-3 p-md-4">
+              <div className="bg-white border rounded-3 p-3 p-md-4 text-start">
 
                 <h5 className="fw-bold mb-4">
 
                   <i
                     className="bi bi-credit-card me-2"
-                    style={{ color: "#fc2779" }}
+                    style={{
+                      color: THEME.primary,
+                    }}
                   ></i>
 
                   Payment Method
@@ -743,10 +1138,11 @@ function Checkout() {
                 </h5>
 
                 <div
-                  className="border rounded-3 p-3"
+                  className="rounded-3 p-3"
                   style={{
-                    backgroundColor: "#fff7fa",
-                    borderColor: "#fc2779",
+                    backgroundColor: THEME.light,
+
+                    border: `1px solid ${THEME.border}`,
                   }}
                 >
 
@@ -757,7 +1153,9 @@ function Checkout() {
                       className="form-check-input"
                       name="paymentMethod"
                       id="cod"
-                      checked={paymentMethod === "COD"}
+                      checked={
+                        paymentMethod === "COD"
+                      }
                       onChange={() =>
                         setPaymentMethod("COD")
                       }
@@ -787,25 +1185,57 @@ function Checkout() {
 
             </div>
 
-            {/* RIGHT SIDE */}
-            <div className="col-lg-4">
+            {/* ===================================== */}
+            {/* RIGHT SIDE - ORDER SUMMARY */}
+            {/* ===================================== */}
 
-              <div className="bg-white border rounded-3 p-3 p-md-4">
+            <div className="col-12 col-lg-4">
+
+              <div className="bg-white border rounded-3 p-3 p-md-4 text-start">
 
                 <h5 className="fw-bold mb-4">
-                  Order Summary ({totalItems} items)
+
+                  <i
+                    className="bi bi-bag-check me-2"
+                    style={{
+                      color: THEME.primary,
+                    }}
+                  ></i>
+
+                  Order Summary ({totalItems}{" "}
+                  {totalItems === 1
+                    ? "item"
+                    : "items"})
+
                 </h5>
 
-                {/* CART PRODUCTS */}
+                {/* BUY NOW MESSAGE */}
+                {isBuyNow && (
+                  <div
+                    className="rounded-3 p-3 small mb-3"
+                    style={{
+                      backgroundColor: THEME.light,
+                      color: THEME.primaryDark,
+                      border: `1px solid ${THEME.border}`,
+                    }}
+                  >
+
+                    <i className="bi bi-info-circle me-2"></i>
+
+                    You are purchasing this product
+                    directly. Your shopping bag will
+                    remain unchanged.
+
+                  </div>
+                )}
+
+                {/* CHECKOUT PRODUCTS */}
                 {cartItems.map((item) => {
+                  const product =
+                    item.product || {};
 
-                  const product = item.product || {};
-
-                  const price = Number(
-                    product.discountPrice ??
-                    product.price ??
-                    0
-                  );
+                  const price =
+                    getProductPrice(product);
 
                   const quantity = Number(
                     item.quantity || 0
@@ -826,9 +1256,11 @@ function Checkout() {
                       cartItems
                     );
 
-                  const image =
-                    product.images?.[0]?.url ||
-                    "https://placehold.co/100x120?text=Product";
+                  // GET CORRECT COLOUR IMAGE
+                  const image = getProductImage(
+                    product,
+                    item.color
+                  );
 
                   return (
                     <div
@@ -836,23 +1268,32 @@ function Checkout() {
                       className="d-flex gap-3 mb-3 pb-3 border-bottom"
                     >
 
+                      {/* PRODUCT IMAGE */}
                       <img
                         src={image}
                         alt={
                           product.productName ||
                           "Product"
                         }
-                        className="rounded border"
+                        className="rounded border flex-shrink-0"
                         style={{
-                          width: "65px",
-                          height: "80px",
+                          width: "75px",
+                          height: "95px",
                           objectFit: "contain",
+                          backgroundColor:
+                            THEME.background,
                         }}
                       />
 
-                      <div className="flex-grow-1">
+                      {/* PRODUCT DETAILS */}
+                      <div
+                        className="flex-grow-1"
+                        style={{
+                          minWidth: 0,
+                        }}
+                      >
 
-                        <h6 className="small fw-bold mb-1">
+                        <h6 className="small fw-bold mb-1 text-break">
                           {product.productName ||
                             "Unavailable Product"}
                         </h6>
@@ -874,19 +1315,23 @@ function Checkout() {
 
                         {/* SELECTED COLOUR */}
                         {item.color && (
-                          <div className="d-flex align-items-center gap-2 small text-secondary mb-1">
+                          <div className="d-flex align-items-center flex-wrap gap-2 small text-secondary mb-1">
 
                             Colour:
 
                             <span
-                              className="rounded-circle"
+                              className="rounded-circle flex-shrink-0"
                               style={{
                                 width: "14px",
                                 height: "14px",
-                                background: getColorHex(
-                                  item.color
-                                ),
-                                border: "1px solid #ccc",
+
+                                background:
+                                  getColorHex(
+                                    item.color
+                                  ),
+
+                                border:
+                                  "1px solid #CCC",
                               }}
                             />
 
@@ -914,7 +1359,7 @@ function Checkout() {
 
                             {availableStock === 0
                               ? "Unavailable or out of stock"
-                              : `Only ${maximumQuantity} allowed for this cart item`}
+                              : `Only ${maximumQuantity} item(s) available`}
 
                           </p>
 
@@ -943,7 +1388,9 @@ function Checkout() {
                     Total Items
                   </span>
 
-                  <span>{totalItems}</span>
+                  <span>
+                    {totalItems}
+                  </span>
 
                 </div>
 
@@ -955,7 +1402,10 @@ function Checkout() {
                   </span>
 
                   <span>
-                    ₹{subtotal.toLocaleString("en-IN")}
+                    ₹
+                    {subtotal.toLocaleString(
+                      "en-IN"
+                    )}
                   </span>
 
                 </div>
@@ -967,7 +1417,7 @@ function Checkout() {
                     Delivery
                   </span>
 
-                  <span className="text-success">
+                  <span className="text-success fw-semibold">
                     FREE
                   </span>
 
@@ -977,9 +1427,11 @@ function Checkout() {
 
                 {/* TOTAL AMOUNT */}
                 <div
-                  className="d-flex justify-content-between align-items-center p-3 rounded-3 mb-4"
+                  className="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 rounded-3 mb-4"
                   style={{
-                    backgroundColor: "#fff0f6",
+                    backgroundColor: THEME.light,
+
+                    color: THEME.primaryDark,
                   }}
                 >
 
@@ -988,14 +1440,19 @@ function Checkout() {
                   </h6>
 
                   <h5 className="fw-bold mb-0">
-                    ₹{subtotal.toLocaleString("en-IN")}
+
+                    ₹
+                    {subtotal.toLocaleString(
+                      "en-IN"
+                    )}
+
                   </h5>
 
                 </div>
 
                 {/* ADDRESS ERROR */}
                 {addressError && (
-                  <div className="alert alert-danger">
+                  <div className="alert alert-danger small">
                     {addressError}
                   </div>
                 )}
@@ -1010,8 +1467,8 @@ function Checkout() {
                 {/* UNCERTAIN ORDER STATUS */}
                 {orderUncertain && (
                   <p className="small text-danger">
-                    Check your existing orders from your
-                    account before trying again.
+                    Check your existing orders from
+                    your account before trying again.
                   </p>
                 )}
 
@@ -1019,33 +1476,35 @@ function Checkout() {
                 {hasStockIssues && (
                   <div className="alert alert-warning small">
 
-                    Resolve stock issues before placing
-                    your order.
+                    Resolve stock issues before
+                    placing your order.
 
                     <Link
-                      to="/cart"
+                      to={returnPath}
                       className="d-block mt-2 fw-semibold text-dark"
                     >
-                      Return to Shopping Bag
+                      {returnLabel}
                     </Link>
 
                   </div>
                 )}
 
-                {/* PLACE ORDER */}
+                {/* PLACE ORDER BUTTON */}
                 <button
                   type="button"
-                  className="btn w-100 py-3 fw-semibold text-white"
+                  className="btn w-100 py-3 fw-semibold text-white rounded-3"
                   style={{
                     backgroundColor:
-                      hasStockIssues || orderUncertain
-                        ? "#999"
-                        : "#fc2779",
+                      hasStockIssues ||
+                      orderUncertain
+                        ? "#999999"
+                        : THEME.primary,
                   }}
                   onClick={handlePlaceOrder}
                   disabled={
                     placingOrder ||
                     cartLoading ||
+                    Boolean(cartError) ||
                     cartItems.length === 0 ||
                     !addressReady ||
                     !selectedAddress ||
@@ -1057,15 +1516,21 @@ function Checkout() {
                   {placingOrder ? (
 
                     <>
+
                       <span className="spinner-border spinner-border-sm me-2"></span>
+
                       PROCESSING ORDER...
+
                     </>
 
                   ) : (
 
                     <>
+
                       <i className="bi bi-bag-check me-2"></i>
+
                       PLACE ORDER
+
                     </>
 
                   )}

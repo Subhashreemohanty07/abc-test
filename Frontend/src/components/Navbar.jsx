@@ -1,9 +1,7 @@
-
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate,useLocation } from "react-router-dom";
 import NotificationBell from "./NotificationBell";
 import sabkooLogo from "../assets/branding/sabkoo-logo.png";
-
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -15,11 +13,11 @@ function Navbar() {
   const [activeCategory, setActiveCategory] = useState("");
   const [accountOpen, setAccountOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
-
-  // WISHLIST
   const [wishlistCount, setWishlistCount] = useState(0);
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const isHomePage = location.pathname === "/";
 
   // CATEGORY DATA
   const categories = [
@@ -59,6 +57,30 @@ function Navbar() {
     },
   ];
 
+  // PROMOTIONAL LINKS
+  const promoLinks = [
+    {
+      label: "Get App",
+      href: "#get-app",
+      icon: "bi-phone",
+    },
+    {
+      label: "Store & Events",
+      href: "#stores",
+      icon: "bi-geo-alt",
+    },
+    {
+      label: "Gift Card",
+      href: "#gift",
+      icon: "bi-gift",
+    },
+    {
+      label: "Help",
+      href: "#help",
+      icon: "bi-question-circle",
+    },
+  ];
+
   // FETCH LOGGED-IN USER
   useEffect(() => {
     let cancelled = false;
@@ -94,17 +116,25 @@ function Navbar() {
 
         const data = await response.json();
 
-        if (cancelled) return;
+        if (
+          cancelled ||
+          localStorage.getItem("token") !== token
+        ) {
+          return;
+        }
 
         if (response.status === 401) {
           localStorage.removeItem("token");
           localStorage.removeItem("user");
+
           setUser(null);
           setWishlistCount(0);
-           setCartCount(0);
+          setCartCount(0);
+
           window.dispatchEvent(new Event("authUpdated"));
         } else if (response.ok && data.user) {
           setUser(data.user);
+
           localStorage.setItem(
             "user",
             JSON.stringify(data.user)
@@ -126,8 +156,7 @@ function Navbar() {
     };
   }, []);
 
-  
-  // FETCH CART COUNT FROM MONGODB
+  // FETCH CART COUNT
   useEffect(() => {
     let cancelled = false;
     let requestNumber = 0;
@@ -142,12 +171,15 @@ function Navbar() {
       }
 
       try {
-        const response = await fetch(`${API_URL}/api/cart`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await fetch(
+          `${API_URL}/api/cart`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
         if (
           cancelled ||
@@ -157,7 +189,10 @@ function Navbar() {
           return;
         }
 
-        if (response.status === 401 || response.status === 403) {
+        if (
+          response.status === 401 ||
+          response.status === 403
+        ) {
           setCartCount(0);
           return;
         }
@@ -167,6 +202,14 @@ function Navbar() {
         }
 
         const data = await response.json();
+
+        if (
+          cancelled ||
+          currentRequest !== requestNumber ||
+          localStorage.getItem("token") !== token
+        ) {
+          return;
+        }
 
         const items = Array.isArray(data.items)
           ? data.items
@@ -229,8 +272,7 @@ function Navbar() {
     };
   }, []);
 
-
-  // FETCH WISHLIST COUNT FOR LOGGED-IN CUSTOMER
+  // FETCH WISHLIST COUNT
   useEffect(() => {
     let cancelled = false;
     let requestNumber = 0;
@@ -263,22 +305,29 @@ function Navbar() {
           return;
         }
 
-        if (response.status === 401) {
-          setWishlistCount(0);
-          return;
-        }
-
-        // Wishlist API is customer-only
-        if (response.status === 403) {
+        if (
+          response.status === 401 ||
+          response.status === 403
+        ) {
           setWishlistCount(0);
           return;
         }
 
         if (!response.ok) {
-          throw new Error("Unable to fetch wishlist count");
+          throw new Error(
+            "Unable to fetch wishlist count"
+          );
         }
 
         const data = await response.json();
+
+        if (
+          cancelled ||
+          currentRequest !== requestNumber ||
+          localStorage.getItem("token") !== token
+        ) {
+          return;
+        }
 
         setWishlistCount(
           Array.isArray(data.products)
@@ -287,7 +336,10 @@ function Navbar() {
         );
       } catch (error) {
         if (!cancelled) {
-          console.error("Wishlist count error:", error);
+          console.error(
+            "Wishlist count error:",
+            error
+          );
         }
       }
     }
@@ -303,10 +355,12 @@ function Navbar() {
       "wishlistUpdated",
       updateWishlistCount
     );
+
     window.addEventListener(
       "authUpdated",
       handleAuthChange
     );
+
     window.addEventListener(
       "storage",
       handleAuthChange
@@ -320,10 +374,12 @@ function Navbar() {
         "wishlistUpdated",
         updateWishlistCount
       );
+
       window.removeEventListener(
         "authUpdated",
         handleAuthChange
       );
+
       window.removeEventListener(
         "storage",
         handleAuthChange
@@ -334,6 +390,13 @@ function Navbar() {
   // CLOSE MENUS
   function closeMenu() {
     setMenuOpen(false);
+    setActiveCategory("");
+    setAccountOpen(false);
+  }
+
+  // TOGGLE MOBILE MENU
+  function toggleMobileMenu() {
+    setMenuOpen((previous) => !previous);
     setActiveCategory("");
     setAccountOpen(false);
   }
@@ -353,17 +416,18 @@ function Navbar() {
     navigate("/");
   }
 
+  // PROFILE NAVIGATION
   function getProfilePath() {
-  if (user?.role === "admin") {
-    return "/admin-dashboard?tab=profile";
-  }
+    if (user?.role === "admin") {
+      return "/admin-dashboard?tab=profile";
+    }
 
-  if (user?.role === "vendor") {
-    return "/vendor-dashboard";
-  }
+    if (user?.role === "vendor") {
+      return "/vendor-dashboard";
+    }
 
-  return "/profile";
-}
+    return "/profile";
+  }
 
   // SEARCH
   function handleSearch(event) {
@@ -371,7 +435,9 @@ function Navbar() {
 
     if (search.trim()) {
       navigate(
-        `/products?search=${encodeURIComponent(search.trim())}`
+        `/products?search=${encodeURIComponent(
+          search.trim()
+        )}`
       );
 
       closeMenu();
@@ -394,6 +460,7 @@ function Navbar() {
       navigate("/signin", {
         state: { from: "/wishlist" },
       });
+
       return;
     }
 
@@ -430,57 +497,94 @@ function Navbar() {
   }
 
   return (
-    <div className="fixed-header">
-      {/* TOP PROMOTIONAL BAR */}
-      <div className="top-promo d-flex justify-content-between align-items-center px-4">
-        <span>✦ FASHION FOR EVERY OCCASION</span>
+    <div
+      className="fixed-header w-100 mw-100"
+      style={{
+        minWidth: 0,
+      }}
+    >
+      {/* =====================================
+          TOP PROMOTIONAL BAR
+      ===================================== */}
 
-        <div className="promo-links d-flex align-items-center gap-3">
-          <a href="#get-app">
-            <i className="bi bi-phone"></i> Get App
-          </a>
+      <div className="top-promo w-100 d-flex flex-column flex-lg-row justify-content-center justify-content-lg-between align-items-center px-2 px-lg-4 py-2">
 
-          <a href="#stores">
-            <i className="bi bi-geo-alt"></i> Store & Events
-          </a>
+        {/* MOBILE PROMOTIONAL TEXT */}
 
-          <a href="#gift">
-            <i className="bi bi-gift"></i> Gift Card
-          </a>
+        <div
+          className="d-lg-none text-center fw-medium w-100"
+          style={{
+            fontSize: "12px",
+            lineHeight: "1.4",
+            overflowWrap: "anywhere",
+          }}
+        >
+          ✦ FASHION FOR EVERY OCCASION
+        </div>
 
-          <a href="#help">
-            <i className="bi bi-question-circle"></i> Help
-          </a>
+        {/* DESKTOP PROMOTIONAL TEXT */}
+
+        <span className="d-none d-lg-block">
+          ✦ FASHION FOR EVERY OCCASION
+        </span>
+
+        {/* DESKTOP PROMOTIONAL LINKS */}
+
+        <div className="promo-links d-none d-lg-flex align-items-center gap-3">
+          {promoLinks.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+            >
+              <i className={`bi ${link.icon}`}></i>
+              {link.label}
+            </a>
+          ))}
         </div>
       </div>
 
-      {/* MAIN NAVBAR */}
-      <nav className="main-navbar">
-        <div className="main-nav-inner d-flex align-items-center justify-content-between">
+      {/* =====================================
+          MAIN NAVBAR
+      ===================================== */}
+
+      <nav className="main-navbar w-100 mw-100">
+        <div
+          className="main-nav-inner w-100 d-flex align-items-center justify-content-between px-3 px-lg-4 gap-2 gap-lg-3"
+          style={{
+            minWidth: 0,
+          }}
+        >
           {/* LOGO */}
+
           <Link
             to="/"
-            className="nykaa-logo"
+            className="nykaa-logo flex-shrink-0"
             onClick={closeMenu}
           >
             <img
               src={sabkooLogo}
               alt="Sabkoo"
+              className="img-fluid"
               style={{
-                width: "150px",
+                width: "clamp(110px, 32vw, 150px)",
                 height: "auto",
-                objectFit: "contain"
+                objectFit: "contain",
               }}
             />
           </Link>
 
-          {/* DESKTOP LINKS */}
+          {/* DESKTOP NAVIGATION */}
+
           <div className="desktop-main-links d-none d-lg-flex align-items-center">
-            <Link to="/products" onClick={closeMenu}>
+            <Link
+              to="/products"
+              onClick={closeMenu}
+            >
               All Products
             </Link>
 
-            {/* MEN AND WOMEN DROPDOWNS */}
+            {/* MEN'S AND WOMEN'S DROPDOWNS */}
+
             {categories.map((category) => (
               <div
                 className="category-item"
@@ -506,6 +610,7 @@ function Navbar() {
                   }
                 >
                   {category.label}
+
                   <i className="bi bi-chevron-down"></i>
                 </button>
 
@@ -536,23 +641,26 @@ function Navbar() {
           </div>
 
           {/* DESKTOP SEARCH */}
-          <form
-            className="search-form d-none d-lg-flex align-items-center"
-            onSubmit={handleSearch}
-          >
-            <i className="bi bi-search search-icon"></i>
+          {isHomePage && (
+            <form
+              className="search-form d-none d-lg-flex align-items-center"
+              onSubmit={handleSearch}
+              style={{ minWidth: 0 }}
+            >
+              <i className="bi bi-search search-icon"></i>
 
-            <input
-              type="search"
-              placeholder="Search on Sabkoo"
-              value={search}
-              onChange={(e) =>
-                setSearch(e.target.value)
-              }
-            />
-          </form>
+              <input
+                type="search"
+                placeholder="Search on Sabkoo"
+                aria-label="Search products"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </form>
+          )}
 
-          {/* ACCOUNT, WISHLIST AND CART */}
+          {/* DESKTOP ACCOUNT AND ACTIONS */}
+
           <div className="account-cart d-none d-lg-flex align-items-center">
             {loading ? (
               <span className="account-loading">
@@ -579,12 +687,12 @@ function Navbar() {
 
                 {accountOpen && (
                   <div className="account-menu">
-                  <Link
-                    to={getProfilePath()}
-                    onClick={closeMenu}
-                  >
-                    My Profile
-                  </Link>
+                    <Link
+                      to={getProfilePath()}
+                      onClick={closeMenu}
+                    >
+                      My Profile
+                    </Link>
 
                     <button
                       type="button"
@@ -599,35 +707,42 @@ function Navbar() {
               <Link
                 to="/signin"
                 className="signin-button"
+                onClick={closeMenu}
               >
                 <i className="bi bi-person person-icon"></i>
+
                 Sign In
               </Link>
             )}
-            {/* CUSTOMER NOTIFICATION BELL */}
-            {!loading && user?.role === "customer" && (
-              <NotificationBell />
-            )}
 
-            {/* WISHLIST ICON BEFORE CART */}
+            {/* DESKTOP NOTIFICATION BELL */}
+
+            {!loading &&
+              user?.role === "customer" && (
+                <NotificationBell />
+              )}
+
+            {/* DESKTOP WISHLIST */}
+
             <button
               type="button"
               className="cart-button position-relative"
               onClick={handleWishlist}
               aria-label={`Wishlist with ${wishlistCount} items`}
               title="My Wishlist"
-              style={{ marginRight: "12px" }}
+              style={{
+                marginRight: "12px",
+              }}
             >
-              <i
-                className="bi bi-heart cart-icon"
-              ></i>
+              <i className="bi bi-heart cart-icon"></i>
 
               <span className="cart-count">
                 {wishlistCount}
               </span>
             </button>
 
-            {/* CART ICON */}
+            {/* DESKTOP CART */}
+
             <button
               type="button"
               className="cart-button"
@@ -642,70 +757,164 @@ function Navbar() {
             </button>
           </div>
 
-          {/* MOBILE HAMBURGER */}
-          <button
-            type="button"
-            className="hamburger-button d-lg-none"
-            onClick={() =>
-              setMenuOpen(!menuOpen)
-            }
-            aria-label="Toggle menu"
-          >
-            <i
-              className={`bi ${
-                menuOpen ? "bi-x-lg" : "bi-list"
-              }`}
-            ></i>
-          </button>
+          {/* =====================================
+              MOBILE ACTIONS
+          ===================================== */}
+
+          <div className="d-flex d-lg-none align-items-center gap-3 flex-shrink-0">
+
+            {/* MOBILE WISHLIST */}
+
+            <button
+              type="button"
+              className="cart-button position-relative p-0"
+              onClick={handleWishlist}
+              aria-label={`Wishlist with ${wishlistCount} items`}
+              style={{
+                fontSize: "21px",
+              }}
+            >
+              <i className="bi bi-heart"></i>
+
+              {wishlistCount > 0 && (
+                <span className="cart-count">
+                  {wishlistCount}
+                </span>
+              )}
+            </button>
+
+            {/* MOBILE CART */}
+
+            <button
+              type="button"
+              className="cart-button position-relative p-0"
+              onClick={handleCart}
+              aria-label={`Shopping cart with ${cartCount} items`}
+              style={{
+                fontSize: "21px",
+              }}
+            >
+              <i className="bi bi-bag"></i>
+
+              {cartCount > 0 && (
+                <span className="cart-count">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+
+            {/* MOBILE HAMBURGER */}
+
+            <button
+              type="button"
+              className="hamburger-button p-0 flex-shrink-0"
+              onClick={toggleMobileMenu}
+              aria-label="Toggle navigation menu"
+              aria-expanded={menuOpen}
+              aria-controls="mobile-navigation"
+            >
+              <i
+                className={`bi ${
+                  menuOpen
+                    ? "bi-x-lg"
+                    : "bi-list"
+                }`}
+              ></i>
+            </button>
+          </div>
         </div>
 
-        {/* MOBILE MENU */}
-        {menuOpen && (
-          <div className="mobile-menu d-flex flex-column">
+        {/* MOBILE SEARCH BAR */}
+        {isHomePage && (
+          <div className="d-lg-none px-3 pb-3">
+            <form
+              className="input-group w-100"
+              onSubmit={handleSearch}
+            >
+              <span
+                className="input-group-text border-end-0 bg-light"
+                style={{ color: "#087F80" }}
+              >
+                <i className="bi bi-search"></i>
+              </span>
 
-            {/* CUSTOMER NAME FIRST */}
+              <input
+                type="search"
+                className="form-control bg-light border-start-0"
+                placeholder="Search on Sabkoo"
+                aria-label="Search products"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  minWidth: 0,
+                  fontSize: "14px",
+                }}
+              />
+
+              <button
+                type="submit"
+                className="btn text-white flex-shrink-0"
+                style={{ backgroundColor: "#087F80" }}
+                aria-label="Search"
+              >
+                Search
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* =====================================
+            MOBILE NAVIGATION MENU
+        ===================================== */}
+
+        {menuOpen && (
+          <div
+            id="mobile-navigation"
+            className="mobile-menu w-100 mw-100 d-flex d-lg-none flex-column px-3 overflow-auto text-start"
+            style={{
+              minWidth: 0,
+              maxHeight: "calc(100dvh - 190px)",
+            }}
+          >
+            {/* CUSTOMER ACCOUNT */}
+
             {loading ? (
               <span className="px-3 py-2">
                 Loading account...
               </span>
             ) : user ? (
-              <div className="mobile-user">
+              <div className="mobile-user text-break">
                 <i className="bi bi-person-circle me-2"></i>
+
                 Hello, {user.name}
               </div>
             ) : (
-              <Link to="/signin" onClick={closeMenu}>
+              <Link
+                to="/signin"
+                onClick={closeMenu}
+              >
                 <i className="bi bi-person me-2"></i>
+
                 Sign In
               </Link>
             )}
 
-            {/* SEARCH */}
-            <form
-              className="mobile-search d-flex gap-2"
-              onSubmit={handleSearch}
-            >
-              <input
-                type="search"
-                placeholder="Search on Sabkoo"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-
-              <button type="submit" aria-label="Search">
-                <i className="bi bi-search"></i>
-              </button>
-            </form>
-
             {/* ALL PRODUCTS */}
-            <Link to="/products" onClick={closeMenu}>
+
+            <Link
+              to="/products"
+              onClick={closeMenu}
+            >
+              <i className="bi bi-grid me-2"></i>
+
               All Products
             </Link>
 
-            {/* MEN'S AND WOMEN'S CATEGORIES */}
+            {/* MOBILE CATEGORY DROPDOWNS */}
+
             {categories.map((category) => (
               <div
-                className="mobile-category"
+                className="mobile-category w-100"
                 key={category.id}
               >
                 <button
@@ -718,21 +927,36 @@ function Navbar() {
                         : category.id
                     )
                   }
-                  aria-expanded={activeCategory === category.id}
+                  aria-expanded={
+                    activeCategory === category.id
+                  }
                 >
                   {category.label}
-                  <i className="bi bi-chevron-down"></i>
+
+                  <i
+                    className={`bi ${
+                      activeCategory === category.id
+                        ? "bi-chevron-up"
+                        : "bi-chevron-down"
+                    }`}
+                  ></i>
                 </button>
 
                 {activeCategory === category.id && (
-                  <div className="mobile-category-list">
+                  <div className="mobile-category-list w-100">
                     {category.columns
-                      .flatMap((column) => column.links)
+                      .flatMap(
+                        (column) => column.links
+                      )
                       .map((link) => (
                         <Link
-                          to={getCategoryLink(category.id, link)}
+                          to={getCategoryLink(
+                            category.id,
+                            link
+                          )}
                           key={link}
                           onClick={closeMenu}
+                          className="text-break"
                         >
                           {link}
                         </Link>
@@ -742,70 +966,109 @@ function Navbar() {
               </div>
             ))}
 
-            {/* NOTIFICATIONS */}
-            {!loading && user?.role === "customer" && (
-              <div
-                className="d-flex align-items-center justify-content-between"
-                style={{ padding: "8px 15px", gap: "10px" }}
-              >
-                <span>
-                  <i className="bi bi-bell me-2"></i>
-                  Notifications
-                </span>
-                <NotificationBell onNavigate={closeMenu} />
-              </div>
-            )}
+            {/* MOBILE NOTIFICATIONS */}
 
-            {/* WISHLIST */}
+            {!loading &&
+              user?.role === "customer" && (
+                <div className="d-flex align-items-center justify-content-between border-bottom py-3 px-1 gap-2">
+                  <span>
+                    <i className="bi bi-bell me-2"></i>
+
+                    Notifications
+                  </span>
+
+                  <NotificationBell
+                    onNavigate={closeMenu}
+                  />
+                </div>
+              )}
+
+            {/* MOBILE WISHLIST */}
+
             <button
               type="button"
               onClick={handleWishlist}
               className="text-start"
             >
               <i className="bi bi-heart me-2"></i>
+
               My Wishlist ({wishlistCount})
             </button>
 
-            {/* SHOPPING CART */}
+            {/* MOBILE CART */}
+
             <button
               type="button"
               onClick={handleCart}
               className="text-start"
             >
               <i className="bi bi-bag me-2"></i>
+
               Shopping Cart ({cartCount})
             </button>
 
-            {/* MY PROFILE */}
+            {/* MOBILE PROFILE */}
+
             {!loading && user && (
               <Link
                 to={getProfilePath()}
                 onClick={closeMenu}
               >
                 <i className="bi bi-person-circle me-2"></i>
+
                 My Profile
               </Link>
             )}
 
-            {/* LOGOUT LAST */}
+            {/* MOBILE PROMOTIONAL LINKS */}
+
+            <div className="mt-3 mb-2">
+              <div
+                className="small fw-semibold text-uppercase px-1 mb-2"
+                style={{
+                  color: "#087F80",
+                }}
+              >
+                More from Sabkoo
+              </div>
+
+              {promoLinks.map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  onClick={closeMenu}
+                  className="d-flex align-items-center gap-2 text-decoration-none text-dark border-bottom py-3 px-1"
+                  style={{
+                    fontSize: "14px",
+                  }}
+                >
+                  <i
+                    className={`bi ${link.icon}`}
+                    style={{
+                      color: "#087F80",
+                    }}
+                  ></i>
+
+                  {link.label}
+                </a>
+              ))}
+            </div>
+
+            {/* LOGOUT */}
+
             {!loading && user && (
               <button
                 type="button"
                 onClick={handleLogout}
-                className="text-start"
-                style={{
-                  color: "#dc3545",
-                  fontWeight: "600",
-                }}
+                className="text-start text-danger fw-semibold"
               >
                 <i className="bi bi-box-arrow-right me-2"></i>
+
                 Logout
               </button>
             )}
-
           </div>
         )}
-
       </nav>
     </div>
   );

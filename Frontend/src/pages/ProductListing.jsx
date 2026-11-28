@@ -603,7 +603,7 @@ function ProductListing() {
     <div className="bg-white min-vh-100">
       <Navbar />
 
-      <main className="container-fluid px-3 px-lg-5 pt-5 pb-4 mt-5">
+      <main className="container-fluid px-3 px-lg-5 pt-3 pt-lg-4 pb-4">
         {/* BREADCRUMB */}
         <nav aria-label="breadcrumb">
           <ol className="breadcrumb small">

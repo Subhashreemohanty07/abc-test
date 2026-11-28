@@ -433,10 +433,7 @@ function Cart() {
 
       <Navbar />
 
-      <main
-        className="container pb-5"
-        style={{ paddingTop: "190px" }}
-      >
+      <main className="container pt-3 pt-lg-4 pb-5">
 
         {/* BREADCRUMB */}
         <nav aria-label="breadcrumb">

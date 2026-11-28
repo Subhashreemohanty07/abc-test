@@ -1,8 +1,9 @@
+/* =================================
+   GLOBAL
+================================= */
 
-/* GLOBAL */
 * {
   box-sizing: border-box;
-  
 }
 
 html {
@@ -14,7 +15,6 @@ body {
   padding: 0;
   width: 100%;
   font-family: Arial, Helvetica, sans-serif;
-
 }
 
 #root {
@@ -24,11 +24,12 @@ body {
 
 .nykaa-home {
   width: 100%;
+  min-width: 0;
   min-height: 100vh;
   background: white;
   color: #333;
-  overflow-x: clip;
 }
+
 
 /* =================================
    NAVBAR
@@ -40,9 +41,12 @@ body {
   left: 0;
   right: 0;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   z-index: 2000;
   background: white;
 }
+
 
 /* TOP PROMOTIONAL BAR */
 
@@ -51,11 +55,6 @@ body {
   min-height: 42px;
   background: linear-gradient(90deg, #fb626d, #ff773d);
   color: white;
-  padding: 0 25px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
 }
 
 .top-promo > span {
@@ -67,7 +66,6 @@ body {
 }
 
 .promo-links {
-  gap: clamp(6px, 1.2vw, 18px);
   white-space: nowrap;
 }
 
@@ -84,10 +82,13 @@ body {
   color: #FFF4DF;
 }
 
-/* SECOND NAVBAR */
+
+/* MAIN NAVBAR */
 
 .main-navbar {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   background: white;
   border-bottom: 1px solid #eee;
   position: relative;
@@ -97,10 +98,12 @@ body {
   min-height: 78px;
   width: 100%;
   max-width: 1500px;
+  min-width: 0;
   margin: auto;
-  padding: 10px 30px;
-  gap: 20px;
 }
+
+
+/* LOGO */
 
 .nykaa-logo {
   color: #087F80;
@@ -112,12 +115,21 @@ body {
   white-space: nowrap;
 }
 
+.nykaa-logo img {
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
 .nykaa-logo:hover {
   color: #087F80;
 }
 
+
+/* DESKTOP NAVIGATION */
+
 .desktop-main-links {
-  gap: 22px;
+  gap: clamp(10px, 1.5vw, 22px);
   white-space: nowrap;
 }
 
@@ -132,6 +144,7 @@ body {
 .desktop-main-links > a:hover {
   color: #087F80;
 }
+
 
 /* MEN AND WOMEN DROPDOWNS */
 
@@ -162,6 +175,7 @@ body {
   color: #087F80;
 }
 
+
 /* MEGA MENU */
 
 .mega-menu {
@@ -185,7 +199,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0;
-  min-width: unset;
+  min-width: 0;
 }
 
 .mega-menu h6 {
@@ -227,7 +241,10 @@ body {
   }
 }
 
-/* SEARCH */
+
+/* =================================
+   DESKTOP SEARCH
+================================= */
 
 .search-form {
   background: #f5f5f5;
@@ -235,6 +252,8 @@ body {
   border-radius: 8px;
   height: 46px;
   width: 290px;
+  max-width: 100%;
+  min-width: 0;
   padding: 0 12px;
   flex-shrink: 1;
   transition: all 0.2s ease;
@@ -253,6 +272,7 @@ body {
 .search-icon {
   color: #777;
   margin-right: 8px;
+  flex-shrink: 0;
 }
 
 .search-form input {
@@ -268,10 +288,29 @@ body {
   box-shadow: none;
 }
 
-/* ACCOUNT AND CART */
+
+/* MOBILE BOOTSTRAP SEARCH */
+
+.main-navbar .input-group {
+  min-width: 0;
+}
+
+.main-navbar .input-group .form-control {
+  min-width: 0;
+}
+
+.main-navbar .input-group .form-control:focus {
+  border-color: #087F80;
+  box-shadow: none;
+}
+
+
+/* =================================
+   ACCOUNT AND CART
+================================= */
 
 .account-cart {
-  gap: 20px;
+  gap: clamp(10px, 1.4vw, 20px);
   flex-shrink: 0;
 }
 
@@ -342,6 +381,9 @@ body {
   color: #087F80;
 }
 
+
+/* WISHLIST AND CART BUTTONS */
+
 .cart-button {
   position: relative;
   display: flex;
@@ -353,6 +395,7 @@ body {
   cursor: pointer;
   color: #171717;
   font-size: 23px;
+  flex-shrink: 0;
   transition: color 0.2s ease;
 }
 
@@ -368,15 +411,19 @@ body {
   color: #ffffff;
   font-size: 11px;
   font-weight: 700;
-  width: 19px;
+  min-width: 19px;
   height: 19px;
-  border-radius: 50%;
+  padding: 0 4px;
+  border-radius: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* MOBILE MENU */
+
+/* =================================
+   MOBILE MENU
+================================= */
 
 .hamburger-button {
   background: transparent;
@@ -384,6 +431,7 @@ body {
   font-size: 27px;
   cursor: pointer;
   color: #333;
+  flex-shrink: 0;
 }
 
 .hamburger-button:hover {
@@ -391,6 +439,9 @@ body {
 }
 
 .mobile-menu {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 12px 18px 18px;
   background: white;
   border-top: 1px solid #eee;
@@ -418,33 +469,11 @@ body {
   color: #087F80;
 }
 
-.mobile-search {
-  margin: 12px 0;
-}
 
-.mobile-search input {
-  flex: 1;
+/* MOBILE CATEGORY */
+
+.mobile-category {
   min-width: 0;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-}
-
-.mobile-search input:focus {
-  outline: none;
-  border-color: #087F80;
-}
-
-.mobile-search button {
-  border: none;
-  color: white;
-  background: #087F80;
-  border-radius: 5px;
-  padding: 0 15px;
-}
-
-.mobile-search button:hover {
-  background: #055C60;
 }
 
 .mobile-category-button {
@@ -467,9 +496,10 @@ body {
 
 .mobile-category-list {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   background: #EEF8F7;
   padding: 10px;
+  width: 100%;
 }
 
 .mobile-category-list a {
@@ -477,6 +507,7 @@ body {
   padding: 9px;
   color: #555;
   text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
 .mobile-category-list a:hover {
@@ -488,23 +519,27 @@ body {
   font-weight: 700;
   color: #087F80;
 }
+
+
 /* =================================
-   MAIN  BANNER
+   MAIN BANNER
 ================================= */
 
 .hero-banner {
   width: 100%;
   margin: 0;
   padding: 0;
-  background: #e80071;
+  background: #ffffff;
 }
 
 .hero-banner img {
   display: block;
   width: 100%;
+  max-width: 100%;
   height: auto;
   object-fit: contain;
 }
+
 
 /* =================================
    OFFER BANNER
@@ -512,12 +547,10 @@ body {
 
 .offer-banner {
   width: 94%;
-  margin: 18px auto;
   min-height: 145px;
   border-radius: 25px;
   background: linear-gradient(100deg, #10BFC1, #087F8C);
   color: white;
-  padding: 20px;
 }
 
 .offer-banner h2 {
@@ -544,24 +577,25 @@ body {
   background: #FFB800;
 }
 
+
 /* =================================
    CATEGORY SECTION
 ================================= */
 
 .home-section {
   width: 100%;
-  padding: 55px 6%;
+  min-width: 0;
 }
 
 .home-section h2 {
-  font-size: 30px;
+  font-size: clamp(23px, 3vw, 30px);
   font-weight: 700;
 }
 
 .home-section > p {
   color: #777;
-  margin-bottom: 30px;
 }
+
 .home-section .category-heading {
   color: #087F80;
   font-weight: 700;
@@ -573,15 +607,20 @@ body {
   margin-right: auto;
 }
 
+
+/* CATEGORY CARDS */
+
 .shop-card {
   height: 100%;
+  min-width: 0;
   border-radius: 18px;
   overflow: hidden;
   padding-bottom: 24px;
   background: #ffffff;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.09);
-  transition: transform 0.3s ease,
-              box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 .shop-card img {
@@ -598,7 +637,7 @@ body {
   font-size: clamp(16px, 2vw, 28px);
   font-weight: 700;
   color: #222222;
-  margin: 18px 8px 12px;
+  overflow-wrap: anywhere;
 }
 
 .shop-card a {
@@ -621,6 +660,7 @@ body {
 .shop-card a:hover {
   color: #055C60;
 }
+
 
 /* =================================
    SOCIAL MEDIA SECTION
@@ -671,12 +711,14 @@ body {
   box-shadow: 0 8px 20px rgba(8, 127, 128, 0.2);
 }
 
+
 /* =================================
    FOOTER
 ================================= */
 
 .nykaa-footer {
   width: 100%;
+  min-width: 0;
   background: #083B40;
   color: white;
 }
@@ -691,6 +733,7 @@ body {
   text-decoration: underline;
 }
 
+
 /* FOOTER TOP */
 
 .footer-top {
@@ -700,6 +743,7 @@ body {
   padding: 40px 8%;
   color: white;
 }
+
 .footer-top h5 {
   color: white;
   font-size: 16px;
@@ -714,6 +758,9 @@ body {
   margin: 7px 0;
 }
 
+
+/* FOOTER NEWSLETTER */
+
 .footer-newsletter form {
   display: flex;
   gap: 8px;
@@ -723,6 +770,7 @@ body {
 .footer-newsletter input {
   width: 190px;
   max-width: 100%;
+  min-width: 0;
   background: transparent;
   border: none;
   border-bottom: 1px solid white;
@@ -752,14 +800,18 @@ body {
   font-size: 13px;
 }
 
-/* FOOTER BOTTOM */
+
+/* =================================
+   FOOTER BOTTOM
+================================= */
 
 .footer-bottom {
   width: 100%;
   max-width: 1400px;
   margin: auto;
-  padding: 60px 35px;
+  padding: 50px 6%;
   color: white;
+  text-align: left;
 }
 
 .footer-bottom h2 {
@@ -775,8 +827,9 @@ body {
 
 .footer-bottom h5 {
   color: white;
-  font-size: 17px;
-  margin-bottom: 25px;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 22px;
 }
 
 .footer-bottom p {
@@ -788,26 +841,25 @@ body {
 
 .footer-bottom > div a {
   display: block;
-  color: white;
+  color: #D0E9E8;
   font-size: 14px;
   margin-bottom: 15px;
+  transition: color 0.2s ease;
+  overflow-wrap: anywhere;
+}
+
+.footer-bottom > div a:hover {
+  color: #FFC61C;
 }
 
 .footer-bottom p:hover {
-  text-decoration: underline;
+  text-decoration: none;
 }
 
-/* COPYRIGHT */
 
-.copyright {
-  border-top: 1px solid #39666A;
-  text-align: center;
-  padding: 18px;
-  font-size: 13px;
-  color: #D0E9E8;
-  background: #062F33;
-}
-/* SABKOO FOOTER DESIGN */
+/* =================================
+   FOOTER FEATURES
+================================= */
 
 .footer-feature {
   text-align: center;
@@ -839,7 +891,10 @@ body {
   font-weight: 600;
 }
 
-/* FOOTER BRAND */
+
+/* =================================
+   FOOTER BRAND
+================================= */
 
 .footer-bottom .footer-brand-name {
   color: #FFC61C;
@@ -865,26 +920,16 @@ body {
   cursor: default;
 }
 
-.footer-bottom {
-  text-align: left;
-  padding: 50px 6%;
-}
 
-.footer-bottom h5 {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 22px;
-}
+/* =================================
+   COPYRIGHT
+================================= */
 
-.footer-bottom > div a {
+.copyright {
+  border-top: 1px solid #39666A;
+  text-align: center;
+  padding: 18px;
+  font-size: 13px;
   color: #D0E9E8;
-  transition: color 0.2s ease;
-}
-
-.footer-bottom > div a:hover {
-  color: #FFC61C;
-}
-
-.footer-bottom p:hover {
-  text-decoration: none;
+  background: #062F33;
 }

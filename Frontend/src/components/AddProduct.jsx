@@ -1,7 +1,8 @@
-
 import { useState } from "react";
 import SizeSelector from "./SizeSelector";
 import ColorSelector from "./ColorSelector";
+import ProductImageUploader from "./ProductImageUploader";
+
 import VariantStockManager, {
   generateVariants,
   calculateTotalStock
@@ -10,6 +11,7 @@ import VariantStockManager, {
 const API_URL = `${import.meta.env.VITE_API_URL}/api/products`;
 
 function AddProduct({ onProductAdded, onCancel }) {
+
   const [formData, setFormData] = useState({
     productName: "",
     description: "",
@@ -24,6 +26,7 @@ function AddProduct({ onProductAdded, onCancel }) {
   });
 
   const [images, setImages] = useState([]);
+  const [compressing, setCompressing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -34,7 +37,9 @@ function AddProduct({ onProductAdded, onCancel }) {
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-      ...(name === "category" ? { subCategory: "" } : {})
+      ...(name === "category"
+        ? { subCategory: "" }
+        : {})
     }));
   }
 
@@ -53,6 +58,9 @@ function AddProduct({ onProductAdded, onCancel }) {
 
   // Update selected colours and generate variants
   function handleColorChange(updatedColors) {
+
+    if (compressing || loading) return;
+
     setFormData((prev) => ({
       ...prev,
       colors: updatedColors,
@@ -62,6 +70,13 @@ function AddProduct({ onProductAdded, onCancel }) {
         prev.variants
       )
     }));
+
+    // Remove images belonging to deselected colours
+    setImages((prev) =>
+      prev.filter((image) =>
+        updatedColors.includes(image.color)
+      )
+    );
   }
 
   // Update individual variant stock
@@ -72,60 +87,78 @@ function AddProduct({ onProductAdded, onCancel }) {
     }));
   }
 
-  // Handle product images
-  function handleImageChange(event) {
-    const selectedImages = Array.from(event.target.files);
-
-    if (selectedImages.length > 5) {
-      setMessage("You can upload a maximum of 5 images.");
-      setImages([]);
-      event.target.value = "";
-      return;
-    }
-
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/webp"
-    ];
-
-    if (
-      selectedImages.some(
-        (file) => !allowedTypes.includes(file.type)
-      )
-    ) {
-      setMessage("Only JPG, PNG and WEBP images are allowed.");
-      setImages([]);
-      event.target.value = "";
-      return;
-    }
-
-    if (
-      selectedImages.some(
-        (file) => file.size > 5 * 1024 * 1024
-      )
-    ) {
-      setMessage("Each image must be smaller than 5 MB.");
-      setImages([]);
-      event.target.value = "";
-      return;
-    }
-
-    setImages(selectedImages);
-    setMessage("");
-  }
-
   // Submit product
   async function handleSubmit(event) {
+
     event.preventDefault();
 
-    if (loading) return;
+    if (loading || compressing) return;
 
     setMessage("");
 
-    // Validate images
-    if (images.length === 0) {
-      setMessage("Please upload at least one product image.");
+    // Validate selected colours
+    if (!formData.colors.length) {
+      setMessage("Please select at least one colour.");
+      return;
+    }
+
+    // Validate images for every selected colour
+    for (const color of formData.colors) {
+
+      const colorImages = images.filter(
+        (image) => image.color === color
+      );
+
+      if (colorImages.length === 0) {
+        setMessage(
+          `Please upload at least one image for ${color}.`
+        );
+        return;
+      }
+
+      if (colorImages.length > 5) {
+        setMessage(
+          `Maximum 5 images allowed for ${color}.`
+        );
+        return;
+      }
+    }
+
+    // Validate maximum images per product
+    if (images.length > 30) {
+      setMessage(
+        "Maximum 30 images allowed per product."
+      );
+      return;
+    }
+
+    // Validate image files and colours
+    if (
+      images.some(
+        (image) =>
+          !image.file ||
+          !formData.colors.includes(image.color)
+      )
+    ) {
+      setMessage(
+        "Invalid product image. Please select the image again."
+      );
+      return;
+    }
+
+    // Calculate total compressed image size
+    const totalImageSize = images.reduce(
+      (total, image) => total + image.file.size,
+      0
+    );
+
+    // Temporary upload limit for Vercel
+    const MAX_UPLOAD_SIZE = 4 * 1024 * 1024;
+
+    if (totalImageSize > MAX_UPLOAD_SIZE) {
+      setMessage(
+        "Total image upload size exceeds 4 MB. Please reduce the number or size of images."
+      );
       return;
     }
 
@@ -134,7 +167,9 @@ function AddProduct({ onProductAdded, onCancel }) {
       !Number.isFinite(Number(formData.price)) ||
       Number(formData.price) <= 0
     ) {
-      setMessage("Please enter a valid product price.");
+      setMessage(
+        "Please enter a valid product price."
+      );
       return;
     }
 
@@ -142,9 +177,12 @@ function AddProduct({ onProductAdded, onCancel }) {
     if (
       formData.discountPrice !== "" &&
       (
-        !Number.isFinite(Number(formData.discountPrice)) ||
+        !Number.isFinite(
+          Number(formData.discountPrice)
+        ) ||
         Number(formData.discountPrice) < 0 ||
-        Number(formData.discountPrice) > Number(formData.price)
+        Number(formData.discountPrice) >
+          Number(formData.price)
       )
     ) {
       setMessage(
@@ -154,14 +192,21 @@ function AddProduct({ onProductAdded, onCancel }) {
     }
 
     // Validate selected sizes and colours
-    if (!formData.sizes.length || !formData.colors.length) {
-      setMessage("Please select at least one size and one colour.");
+    if (
+      !formData.sizes.length ||
+      !formData.colors.length
+    ) {
+      setMessage(
+        "Please select at least one size and one colour."
+      );
       return;
     }
 
     // Validate variant availability
     if (!formData.variants.length) {
-      setMessage("Please configure product variant inventory.");
+      setMessage(
+        "Please configure product variant inventory."
+      );
       return;
     }
 
@@ -181,7 +226,9 @@ function AddProduct({ onProductAdded, onCancel }) {
     }
 
     // Calculate total product stock
-    const totalStock = calculateTotalStock(formData.variants);
+    const totalStock = calculateTotalStock(
+      formData.variants
+    );
 
     if (!Number.isSafeInteger(totalStock)) {
       setMessage("Invalid total stock quantity.");
@@ -204,20 +251,55 @@ function AddProduct({ onProductAdded, onCancel }) {
       stock: totalStock
     };
 
-    Object.entries(productPayload).forEach(([key, value]) => {
-      if (Array.isArray(value)) {
-        productData.append(key, JSON.stringify(value));
-      } else {
-        productData.append(key, value);
+    // Append product details
+    Object.entries(productPayload).forEach(
+      ([key, value]) => {
+        if (Array.isArray(value)) {
+          productData.append(
+            key,
+            JSON.stringify(value)
+          );
+        } else {
+          productData.append(key, value);
+        }
       }
+    );
+
+    // Prepare colour-wise image metadata
+    const imageMetadata = [];
+
+    formData.colors.forEach((color) => {
+
+      const colorImages = images.filter(
+        (image) => image.color === color
+      );
+
+      colorImages.forEach((image, index) => {
+
+        // Append compressed image file
+        productData.append(
+          "images",
+          image.file
+        );
+
+        // Append matching colour information
+        imageMetadata.push({
+          color: color,
+          isPrimary: index === 0,
+          sortOrder: index
+        });
+
+      });
     });
 
-    // Append product images
-    images.forEach((image) => {
-      productData.append("images", image);
-    });
+    // Send image metadata to backend
+    productData.append(
+      "imageMetadata",
+      JSON.stringify(imageMetadata)
+    );
 
     try {
+
       setLoading(true);
 
       const response = await fetch(API_URL, {
@@ -252,20 +334,21 @@ function AddProduct({ onProductAdded, onCancel }) {
         variants: []
       });
 
+      // Reset uploaded images
       setImages([]);
-
-      const fileInput = document.getElementById("productImages");
-
-      if (fileInput) {
-        fileInput.value = "";
-      }
 
       onProductAdded?.(data.product || data);
 
     } catch (error) {
-      setMessage(error.message);
+
+      setMessage(
+        error.message || "Unable to add product."
+      );
+
     } finally {
+
       setLoading(false);
+
     }
   }
 
@@ -277,46 +360,65 @@ function AddProduct({ onProductAdded, onCancel }) {
         border: "1px solid #F4DCD3"
       }}
     >
-    <div className="card-body p-3 p-md-4">
 
+      <div className="card-body p-3 p-md-4">
+
+        {/* Page Header */}
         <div
-  className="rounded-4 p-3 p-md-4 mb-4 text-start"
-  style={{
-    backgroundColor: "#FFF1EB",
-    border: "1px solid #F4DCD3"
-  }}
->
-  <div className="d-flex align-items-center gap-3">
-    <div
-      className="rounded-3 p-3 text-white flex-shrink-0"
-      style={{
-        background: "linear-gradient(180deg, #E65A20, #D93620)"
-      }}
-    >
-      <i className="bi bi-plus-circle fs-4"></i>
-    </div>
+          className="rounded-4 p-3 p-md-4 mb-4 text-start"
+          style={{
+            backgroundColor: "#FFF1EB",
+            border: "1px solid #F4DCD3"
+          }}
+        >
 
-    <div>
-      <h4
-        className="fw-bold mb-1"
-        style={{ color: "#2D202E" }}
-      >
-        Add New Product
-      </h4>
+          <div className="d-flex align-items-center gap-3">
 
-      <p className="text-secondary small mb-0">
-        Enter your product details, configure variant
-        inventory and upload product images.
-      </p>
-    </div>
-  </div>
-</div>
+            <div
+              className="rounded-3 p-3 text-white flex-shrink-0"
+              style={{
+                background:
+                  "linear-gradient(180deg, #E65A20, #D93620)"
+              }}
+            >
+              <i className="bi bi-plus-circle fs-4"></i>
+            </div>
 
-        <form onSubmit={handleSubmit} className="text-start">
-          <div className="row g-3">
+            <div>
+
+              <h4
+                className="fw-bold mb-1"
+                style={{ color: "#2D202E" }}
+              >
+                Add New Product
+              </h4>
+
+              <p className="text-secondary small mb-0">
+                Enter your product details, configure
+                variant inventory and upload
+                colour-wise product images.
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* Product Form */}
+        <form
+          onSubmit={handleSubmit}
+          className="text-start"
+        >
+
+          <fieldset
+            disabled={loading || compressing}
+            className="row g-3"
+          >
 
             {/* Product Name */}
             <div className="col-md-6">
+
               <label className="form-label fw-semibold">
                 Product Name *
               </label>
@@ -329,10 +431,12 @@ function AddProduct({ onProductAdded, onCancel }) {
                 onChange={handleChange}
                 required
               />
+
             </div>
 
             {/* Brand */}
             <div className="col-md-6">
+
               <label className="form-label fw-semibold">
                 Brand *
               </label>
@@ -345,10 +449,12 @@ function AddProduct({ onProductAdded, onCancel }) {
                 onChange={handleChange}
                 required
               />
+
             </div>
 
             {/* Description */}
             <div className="col-12">
+
               <label className="form-label fw-semibold">
                 Description *
               </label>
@@ -361,10 +467,12 @@ function AddProduct({ onProductAdded, onCancel }) {
                 onChange={handleChange}
                 required
               />
+
             </div>
 
             {/* Category */}
             <div className="col-md-6">
+
               <label className="form-label fw-semibold">
                 Category *
               </label>
@@ -375,13 +483,22 @@ function AddProduct({ onProductAdded, onCancel }) {
                 value={formData.category}
                 onChange={handleChange}
               >
-                <option value="men">Men</option>
-                <option value="women">Women</option>
+
+                <option value="men">
+                  Men
+                </option>
+
+                <option value="women">
+                  Women
+                </option>
+
               </select>
+
             </div>
 
             {/* Subcategory */}
             <div className="col-md-6">
+
               <label className="form-label fw-semibold">
                 Subcategory *
               </label>
@@ -393,6 +510,7 @@ function AddProduct({ onProductAdded, onCancel }) {
                 onChange={handleChange}
                 required
               >
+
                 <option value="">
                   Select subcategory
                 </option>
@@ -416,15 +534,23 @@ function AddProduct({ onProductAdded, onCancel }) {
                         "Ethnic Wear"
                       ]
                 ).map((item) => (
-                  <option key={item} value={item}>
+
+                  <option
+                    key={item}
+                    value={item}
+                  >
                     {item}
                   </option>
+
                 ))}
+
               </select>
+
             </div>
 
             {/* Original Price */}
             <div className="col-md-6">
+
               <label className="form-label fw-semibold">
                 Original Price (₹) *
               </label>
@@ -434,14 +560,17 @@ function AddProduct({ onProductAdded, onCancel }) {
                 name="price"
                 className="form-control rounded-3 py-2"
                 min="1"
+                step="0.01"
                 value={formData.price}
                 onChange={handleChange}
                 required
               />
+
             </div>
 
             {/* Discount Price */}
             <div className="col-md-6">
+
               <label className="form-label fw-semibold">
                 Discount Price (₹)
               </label>
@@ -451,9 +580,11 @@ function AddProduct({ onProductAdded, onCancel }) {
                 name="discountPrice"
                 className="form-control rounded-3 py-2"
                 min="0"
+                step="0.01"
                 value={formData.discountPrice}
                 onChange={handleChange}
               />
+
             </div>
 
             {/* Reusable Size Selector */}
@@ -474,86 +605,69 @@ function AddProduct({ onProductAdded, onCancel }) {
               onChange={handleVariantChange}
             />
 
-            {/* Product Images */}
-            <div className="col-12">
-              <label className="form-label fw-semibold">
-                Product Images * (Maximum 5)
-              </label>
+            {/* Colour-wise Product Images */}
+            <ProductImageUploader
+              selectedColors={formData.colors}
+              images={images}
+              onChange={setImages}
+              processing={compressing}
+              onProcessingChange={setCompressing}
+              disabled={loading || compressing}
+            />
 
-              <input
-                id="productImages"
-                type="file"
-                className="form-control rounded-3 py-2"
-                accept="image/jpeg,image/png,image/webp"
-                multiple
-                onChange={handleImageChange}
-              />
-
-              <small className="text-secondary">
-                JPG, PNG or WEBP. Maximum 5 MB per image.
-              </small>
-
-              {/* Image Preview */}
-              {images.length > 0 && (
-                <div className="mt-3 d-flex flex-wrap gap-3">
-                  {images.map((image, index) => (
-                    <div key={`${image.name}-${index}`}>
-
-                      <img
-                        src={URL.createObjectURL(image)}
-                        alt={image.name}
-                        width="90"
-                        height="90"
-                        className="rounded border"
-                        style={{ objectFit: "cover" }}
-                        onLoad={(event) =>
-                          URL.revokeObjectURL(
-                            event.currentTarget.src
-                          )
-                        }
-                      />
-
-                      <small
-                        className="d-block text-truncate"
-                        style={{ maxWidth: "90px" }}
-                      >
-                        {image.name}
-                      </small>
-
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-          </div>
+          </fieldset>
 
           {/* Status Message */}
           {message && (
-            <div className="alert alert-info mt-3 mb-0">
+            <div
+              className={`alert mt-3 mb-0 ${
+                message === "Product added successfully!"
+                  ? "alert-success"
+                  : "alert-danger"
+              }`}
+            >
               {message}
             </div>
           )}
 
           {/* Form Buttons */}
-          <div className="d-flex gap-2 mt-4">
+          <div className="d-flex flex-wrap gap-2 mt-4">
 
+            {/* Save Product Button */}
             <button
               type="submit"
               className="btn text-white fw-semibold rounded-3 px-4 py-2"
               style={{
-                background: "linear-gradient(180deg, #E65A20, #D93620)",
+                background:
+                  "linear-gradient(180deg, #E65A20, #D93620)",
                 border: "none",
-                boxShadow: "0 4px 10px rgba(217, 54, 32, 0.18)"
+                boxShadow:
+                  "0 4px 10px rgba(217, 54, 32, 0.18)"
               }}
-              disabled={loading}
+              disabled={loading || compressing}
             >
-              <i className="bi bi-check-circle me-2"></i>
 
-              {loading ? "Saving..." : "Save Product"}
+              {loading || compressing ? (
+
+                <span className="spinner-border spinner-border-sm me-2" />
+
+              ) : (
+
+                <i className="bi bi-check-circle me-2"></i>
+
+              )}
+
+              {compressing
+                ? "Compressing Images..."
+                : loading
+                  ? "Saving..."
+                  : "Save Product"}
+
             </button>
 
+            {/* Cancel Button */}
             {onCancel && (
+
               <button
                 type="button"
                 className="btn rounded-3 px-4 py-2"
@@ -563,15 +677,19 @@ function AddProduct({ onProductAdded, onCancel }) {
                   border: "1px solid #D93620"
                 }}
                 onClick={onCancel}
-                disabled={loading}
+                disabled={loading || compressing}
               >
                 Cancel
               </button>
+
             )}
 
           </div>
+
         </form>
+
       </div>
+
     </div>
   );
 }

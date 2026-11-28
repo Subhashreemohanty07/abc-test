@@ -79,20 +79,43 @@ const productSchema = new mongoose.Schema(
       min: 0
     },
 
-    // 6. Product images
+    // 6. Colour-wise product image
     images: [
       {
         url: {
           type: String,
           required: true
         },
+
         publicId: {
           type: String,
           default: null
+        },
+
+        color: {
+          type: String,
+          trim: true,
+          default: null
+        },
+
+        provider: {
+          type: String,
+          enum: ["cloudinary", "r2"],
+          default: "cloudinary"
+        },
+
+        isPrimary: {
+          type: Boolean,
+          default: false
+        },
+
+        sortOrder: {
+          type: Number,
+          default: 0,
+          min: 0
         }
       }
     ],
-
     // 7. Available sizes
     sizes: {
       type: [String],

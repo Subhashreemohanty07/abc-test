@@ -293,23 +293,55 @@ async function restoreInventory(item, session) {
 
 
 // POST /api/orders
-// CUSTOMER PLACES AN ORDER
+// POST /api/orders
+// CUSTOMER PLACES CART OR BUY NOW ORDER
+
 router.post("/", allowRoles("customer"), async (req, res) => {
   const {
     addressId,
     paymentMethod = "COD",
-  } = req.body;
+    checkoutMode = "cart",
+    buyNowItem,
+  } = req.body || {};
 
+  // VALIDATE CHECKOUT MODE
+  if (!["cart", "buyNow"].includes(checkoutMode)) {
+    return res.status(400).json({
+      message: "Invalid checkout mode.",
+    });
+  }
+
+  const isBuyNow = checkoutMode === "buyNow";
+
+  // VALIDATE DELIVERY ADDRESS
   if (!mongoose.isValidObjectId(addressId)) {
     return res.status(400).json({
       message: "Please select a valid delivery address.",
     });
   }
 
+  // VALIDATE PAYMENT METHOD
   if (paymentMethod !== "COD") {
     return res.status(400).json({
       message: "Only Cash on Delivery is currently supported.",
     });
+  }
+
+  // VALIDATE BUY NOW REQUEST
+  if (isBuyNow) {
+    if (
+      !buyNowItem ||
+      typeof buyNowItem.productId !== "string" ||
+      !mongoose.isValidObjectId(buyNowItem.productId) ||
+      !Number.isSafeInteger(buyNowItem.quantity) ||
+      buyNowItem.quantity < 1 ||
+      typeof buyNowItem.size !== "string" ||
+      typeof buyNowItem.color !== "string"
+    ) {
+      return res.status(400).json({
+        message: "Invalid Buy Now product details.",
+      });
+    }
   }
 
   let session;
@@ -335,27 +367,46 @@ router.post("/", allowRoles("customer"), async (req, res) => {
         );
       }
 
-      // GET CUSTOMER CART
-      const cart = await Cart.findOne({
-        user: userId,
-      }).session(session);
+      let cart = null;
+      let itemsToOrder = [];
 
-      if (!cart || cart.items.length === 0) {
-        throw createError("Your cart is empty.");
+      // BUY NOW CHECKOUT
+      if (isBuyNow) {
+        itemsToOrder = [
+          {
+            product: buyNowItem.productId,
+            quantity: buyNowItem.quantity,
+            size: buyNowItem.size.trim(),
+            color: buyNowItem.color.trim(),
+          },
+        ];
+      }
+
+      // NORMAL CART CHECKOUT
+      else {
+        cart = await Cart.findOne({
+          user: userId,
+        }).session(session);
+
+        if (!cart || cart.items.length === 0) {
+          throw createError("Your cart is empty.");
+        }
+
+        itemsToOrder = cart.items;
       }
 
       const orderItems = [];
       let subtotal = 0;
 
-      // VALIDATE EACH CART ITEM
-      for (const item of cart.items) {
+      // VALIDATE EACH ORDER ITEM
+      for (const item of itemsToOrder) {
         const quantity = Number(item.quantity);
 
         if (
           !Number.isSafeInteger(quantity) ||
           quantity < 1
         ) {
-          throw createError("Invalid cart quantity.");
+          throw createError("Invalid product quantity.");
         }
 
         // FETCH LATEST PRODUCT DETAILS
@@ -365,7 +416,7 @@ router.post("/", allowRoles("customer"), async (req, res) => {
 
         if (!product) {
           throw createError(
-            "A product in your cart is no longer available."
+            "A selected product is no longer available."
           );
         }
 
@@ -394,13 +445,49 @@ router.post("/", allowRoles("customer"), async (req, res) => {
           throw createError("Invalid order amount.");
         }
 
+        // GET IMAGE FOR SELECTED COLOUR
+        const productImages = Array.isArray(product.images)
+          ? product.images.filter((image) => image?.url)
+          : [];
+
+        const selectedColor = String(
+          item.color || ""
+        ).trim().toLowerCase();
+
+        const matchingImages = productImages.filter(
+          (image) =>
+            String(image.color || "").trim().toLowerCase() ===
+            selectedColor
+        );
+
+        const legacyImages = productImages.filter(
+          (image) => !String(image.color || "").trim()
+        );
+
+        const availableImages = selectedColor
+          ? matchingImages.length
+            ? matchingImages
+            : legacyImages
+          : productImages;
+
+        const sortedImages = [...availableImages].sort(
+          (a, b) =>
+            Number(Boolean(b.isPrimary)) -
+              Number(Boolean(a.isPrimary)) ||
+            Number(a.sortOrder ?? 0) -
+              Number(b.sortOrder ?? 0)
+        );
+
+        const selectedImage =
+          sortedImages[0]?.url || "";
+
         // SAVE PRODUCT SNAPSHOT
         orderItems.push({
           product: product._id,
           vendor: product.createdBy,
           productName: product.productName,
           brand: product.brand,
-          image: product.images?.[0]?.url || "",
+          image: selectedImage,
           price,
           quantity,
           size: item.size || "",
@@ -450,13 +537,16 @@ router.post("/", allowRoles("customer"), async (req, res) => {
 
       createdOrder = orders[0];
 
-      // EMPTY CART AFTER SUCCESSFUL ORDER CREATION
-      cart.items = [];
+      // CLEAR CART ONLY FOR NORMAL CART CHECKOUT
+      if (!isBuyNow && cart) {
+        cart.items = [];
 
-      await cart.save({ session });
+        await cart.save({ session });
+      }
+
+      // BUY NOW DOES NOT MODIFY THE CUSTOMER CART
     });
 
-    // TRANSACTION SUCCESSFUL
     return res.status(201).json({
       message: "Order placed successfully.",
       order: createdOrder,
@@ -468,7 +558,7 @@ router.post("/", allowRoles("customer"), async (req, res) => {
     if (error.name === "VersionError") {
       return res.status(409).json({
         message:
-          "Your cart has changed. Please refresh and try again.",
+          "Product or cart details have changed. Please refresh and try again.",
       });
     }
 

@@ -1,12 +1,25 @@
-
 import express from "express";
 import Product from "../models/Product.js";
 import User from "../models/User.js";
 import authMiddleware from "../middleware/authMiddleware.js";
-import upload from "../middleware/uploadMiddleware.js";
-import cloudinary from "../config/cloudinary.js";
-import { createPriceDropNotifications } from "../services/bellNotification.js";
-import { sendPriceDropEmails } from "../services/emailNotification.js";
+
+import upload, {
+  MAX_IMAGES_PER_COLOR,
+  MAX_PRODUCT_IMAGES
+} from "../middleware/uploadMiddleware.js";
+
+import {
+  uploadImage,
+  deleteImage
+} from "../services/imageStorage.js";
+
+import {
+  createPriceDropNotifications
+} from "../services/bellNotification.js";
+
+import {
+  sendPriceDropEmails
+} from "../services/emailNotification.js";
 
 const router = express.Router();
 
@@ -16,19 +29,25 @@ const loadCurrentUser = async (req, res, next) => {
     const user = await User.findById(req.user.userId);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({
+        message: "User not found"
+      });
     }
 
     req.currentUser = user;
     next();
+
   } catch (error) {
-    res.status(500).json({ message: "Unable to verify user" });
+    res.status(500).json({
+      message: "Unable to verify user"
+    });
   }
 };
 
 // Check user role
 const allowRoles = (...roles) => {
   return (req, res, next) => {
+
     if (!roles.includes(req.currentUser.role)) {
       return res.status(403).json({
         message: "You do not have permission"
@@ -41,28 +60,39 @@ const allowRoles = (...roles) => {
 
 // Convert sizes, colors and variants into arrays
 const parseArray = (value) => {
+
   if (Array.isArray(value)) return value;
+
   if (typeof value !== "string") return [];
 
   try {
     const parsed = JSON.parse(value);
+
     return Array.isArray(parsed) ? parsed : [];
+
   } catch {
-    return value.split(",").map(item => item.trim()).filter(Boolean);
+    return value
+      .split(",")
+      .map(item => item.trim())
+      .filter(Boolean);
   }
 };
 
 // Validate and prepare size-colour inventory
 const prepareVariants = (value, sizes, colors) => {
+
   const variants = parseArray(value);
 
   if (variants.length === 0) {
-    throw new Error("At least one product variant is required");
+    throw new Error(
+      "At least one product variant is required"
+    );
   }
 
   const combinations = new Set();
 
   const validatedVariants = variants.map((variant) => {
+
     if (
       !variant ||
       typeof variant.size !== "string" ||
@@ -87,14 +117,18 @@ const prepareVariants = (value, sizes, colors) => {
 
     // Validate stock
     if (!Number.isSafeInteger(stock) || stock < 0) {
-      throw new Error(`Invalid stock for ${size} - ${color}`);
+      throw new Error(
+        `Invalid stock for ${size} - ${color}`
+      );
     }
 
     // Prevent duplicate combinations
     const key = JSON.stringify([size, color]);
 
     if (combinations.has(key)) {
-      throw new Error(`Duplicate variant: ${size} - ${color}`);
+      throw new Error(
+        `Duplicate variant: ${size} - ${color}`
+      );
     }
 
     combinations.add(key);
@@ -106,7 +140,8 @@ const prepareVariants = (value, sizes, colors) => {
     };
   });
 
-  // Ensure every selected size-colour combination has stock information
+  // Ensure every selected size-colour combination
+  // has stock information
   if (
     validatedVariants.length !==
     new Set(sizes).size * new Set(colors).size
@@ -132,34 +167,384 @@ const prepareVariants = (value, sizes, colors) => {
   };
 };
 
-// Upload image to Cloudinary
-const uploadToCloudinary = (file) => {
-  const base64 = file.buffer.toString("base64");
-  const dataUri = `data:${file.mimetype};base64,${base64}`;
+// Validate colour-wise product images
+// Used by Add Product and complete image replacement
+const prepareImageMetadata = (
+  files,
+  rawMetadata,
+  colors
+) => {
 
-  return cloudinary.uploader.upload(dataUri, {
-    folder: "nykaa-products"
+  if (!Array.isArray(files) || files.length === 0) {
+    throw new Error("Please upload product images");
+  }
+
+  if (files.length > MAX_PRODUCT_IMAGES) {
+    throw new Error(
+      `Maximum ${MAX_PRODUCT_IMAGES} images allowed per product`
+    );
+  }
+
+  if (
+    !Array.isArray(colors) ||
+    colors.length === 0 ||
+    colors.some(
+      color =>
+        typeof color !== "string" ||
+        !color.trim()
+    ) ||
+    new Set(colors).size !== colors.length
+  ) {
+    throw new Error("Invalid selected colours");
+  }
+
+  let metadata;
+
+  try {
+    metadata =
+      typeof rawMetadata === "string"
+        ? JSON.parse(rawMetadata)
+        : rawMetadata;
+
+  } catch {
+    throw new Error("Invalid image metadata");
+  }
+
+  if (
+    !Array.isArray(metadata) ||
+    metadata.length !== files.length
+  ) {
+    throw new Error(
+      "Colour information is required for every image"
+    );
+  }
+
+  const colorCounts = new Map();
+
+  const validatedMetadata = metadata.map((item) => {
+
+    if (
+      !item ||
+      typeof item.color !== "string"
+    ) {
+      throw new Error("Invalid image colour");
+    }
+
+    const color = item.color.trim();
+
+    // Check whether colour belongs to product
+    if (!colors.includes(color)) {
+      throw new Error(
+        `Image colour ${color} is not selected`
+      );
+    }
+
+    const count = colorCounts.get(color) || 0;
+
+    // Maximum five images per colour
+    if (count >= MAX_IMAGES_PER_COLOR) {
+      throw new Error(
+        `Maximum ${MAX_IMAGES_PER_COLOR} images allowed for ${color}`
+      );
+    }
+
+    colorCounts.set(color, count + 1);
+
+    return {
+      color,
+      isPrimary: count === 0,
+      sortOrder: count
+    };
   });
+
+  // Every selected colour must have an image
+  for (const color of colors) {
+
+    if (!colorCounts.has(color)) {
+      throw new Error(
+        `Upload at least one image for ${color}`
+      );
+    }
+  }
+
+  return validatedMetadata;
+};
+
+// Validate existing and newly uploaded product images
+// Used by Edit Product
+const prepareImageUpdate = (
+  files,
+  rawManifest,
+  colors,
+  oldImages
+) => {
+
+  let manifest;
+
+  try {
+    manifest =
+      typeof rawManifest === "string"
+        ? JSON.parse(rawManifest)
+        : rawManifest;
+
+  } catch {
+    throw new Error("Invalid image manifest");
+  }
+
+  // Validate selected colours
+  if (
+    !Array.isArray(colors) ||
+    colors.length === 0 ||
+    colors.some(
+      color =>
+        typeof color !== "string" ||
+        !color.trim()
+    ) ||
+    new Set(colors).size !== colors.length
+  ) {
+    throw new Error("Invalid selected colours");
+  }
+
+  // Validate final image collection
+  if (
+    !Array.isArray(manifest) ||
+    manifest.length === 0
+  ) {
+    throw new Error("Please provide product images");
+  }
+
+  if (manifest.length > MAX_PRODUCT_IMAGES) {
+    throw new Error(
+      `Maximum ${MAX_PRODUCT_IMAGES} images allowed per product`
+    );
+  }
+
+  const uploadedFiles = files || [];
+
+  // Map existing product images by MongoDB image ID
+  const existingImageMap = new Map(
+    oldImages
+      .filter(image => image._id)
+      .map(image => [
+        String(image._id),
+        image
+      ])
+  );
+
+  const usedExistingIds = new Set();
+  const usedFileIndexes = new Set();
+  const colorCounts = new Map();
+
+  const preparedImages = manifest.map(item => {
+
+    if (
+      !item ||
+      typeof item.color !== "string"
+    ) {
+      throw new Error("Invalid image colour");
+    }
+
+    const color = item.color.trim();
+
+    // Ensure colour belongs to the product
+    if (!colors.includes(color)) {
+      throw new Error(
+        `Image colour ${color} is not selected`
+      );
+    }
+
+    const count = colorCounts.get(color) || 0;
+
+    // Maximum five images per colour
+    if (count >= MAX_IMAGES_PER_COLOR) {
+      throw new Error(
+        `Maximum ${MAX_IMAGES_PER_COLOR} images allowed for ${color}`
+      );
+    }
+
+    colorCounts.set(color, count + 1);
+
+    // First image of each colour becomes primary
+    const metadata = {
+      color,
+      isPrimary: count === 0,
+      sortOrder: count
+    };
+
+    // Retain an existing product image
+    if (item.type === "existing") {
+
+      if (
+        typeof item.imageId !== "string" ||
+        !existingImageMap.has(item.imageId)
+      ) {
+        throw new Error("Invalid existing image");
+      }
+
+      if (usedExistingIds.has(item.imageId)) {
+        throw new Error("Duplicate existing image");
+      }
+
+      usedExistingIds.add(item.imageId);
+
+      const existingImage =
+        existingImageMap.get(item.imageId);
+
+      return {
+        type: "existing",
+        image: existingImage,
+        metadata
+      };
+    }
+
+    // Upload a new product image
+    if (item.type === "new") {
+
+      const fileIndex = item.fileIndex;
+
+      if (
+        !Number.isSafeInteger(fileIndex) ||
+        fileIndex < 0 ||
+        fileIndex >= uploadedFiles.length
+      ) {
+        throw new Error(
+          "Invalid uploaded image index"
+        );
+      }
+
+      if (usedFileIndexes.has(fileIndex)) {
+        throw new Error("Duplicate uploaded image");
+      }
+
+      usedFileIndexes.add(fileIndex);
+
+      return {
+        type: "new",
+        file: uploadedFiles[fileIndex],
+        metadata
+      };
+    }
+
+    throw new Error("Invalid image type");
+  });
+
+  // Ensure every uploaded file is included
+  if (
+    usedFileIndexes.size !== uploadedFiles.length
+  ) {
+    throw new Error(
+      "Image information is required for every uploaded file"
+    );
+  }
+
+  // Every selected colour must have an image
+  for (const color of colors) {
+
+    if (!colorCounts.has(color)) {
+      throw new Error(
+        `Upload at least one image for ${color}`
+      );
+    }
+  }
+
+  return preparedImages;
+};
+
+// Get unique storage identifier for an image
+const getImageStorageKey = (image) => {
+
+  if (!image?.publicId) return null;
+
+  return JSON.stringify([
+    image.provider || "cloudinary",
+    image.publicId
+  ]);
+};
+
+// Find images removed from the final collection
+const getRemovedImages = (
+  oldImages,
+  finalImages
+) => {
+
+  const retainedStorageKeys = new Set(
+    finalImages
+      .map(getImageStorageKey)
+      .filter(Boolean)
+  );
+
+  return oldImages.filter(image => {
+
+    const storageKey = getImageStorageKey(image);
+
+    return (
+      storageKey &&
+      !retainedStorageKeys.has(storageKey)
+    );
+  });
+};
+
+// Safely delete images from storage
+// Supports Cloudinary and future R2 migration
+const cleanupImages = async (
+  images,
+  errorMessage = "Image cleanup error:"
+) => {
+
+  const deletedStorageKeys = new Set();
+
+  for (const image of images) {
+
+    const storageKey = getImageStorageKey(image);
+
+    if (
+      !storageKey ||
+      deletedStorageKeys.has(storageKey)
+    ) {
+      continue;
+    }
+
+    deletedStorageKeys.add(storageKey);
+
+    try {
+      await deleteImage(image);
+
+    } catch (error) {
+      console.error(errorMessage, error);
+    }
+  }
 };
 
 // Get actual selling price
 const getSellingPrice = (product) => {
+
   return product.discountPrice != null
     ? Number(product.discountPrice)
     : Number(product.price);
 };
 
-// 1. Get all products
+
+// ==================================================
+// 1. GET ALL PRODUCTS
+// ==================================================
+
 router.get("/", async (req, res) => {
+
   try {
+
     const products = await Product.find()
-      .populate("createdBy", "name email vendorDetails.storeName");
+      .populate(
+        "createdBy",
+        "name email vendorDetails.storeName"
+      );
 
     res.status(200).json({
       message: "Products fetched successfully",
       products
     });
+
   } catch (error) {
+
     console.error(error);
 
     res.status(500).json({
@@ -168,20 +553,31 @@ router.get("/", async (req, res) => {
   }
 });
 
-// 2. Get products added by logged-in vendor
+
+// ==================================================
+// 2. GET PRODUCTS ADDED BY LOGGED-IN VENDOR
+// ==================================================
+
 router.get(
   "/mine",
   authMiddleware,
   loadCurrentUser,
   allowRoles("vendor"),
+
   async (req, res) => {
+
     try {
+
       const products = await Product.find({
         createdBy: req.currentUser._id
       });
 
-      res.status(200).json({ products });
+      res.status(200).json({
+        products
+      });
+
     } catch (error) {
+
       res.status(500).json({
         message: "Unable to fetch your products"
       });
@@ -189,17 +585,26 @@ router.get(
   }
 );
 
-// 3. Add product (Vendor or Admin)
+
+// ==================================================
+// 3. ADD PRODUCT (VENDOR OR ADMIN)
+// ==================================================
+
 router.post(
   "/",
   authMiddleware,
   loadCurrentUser,
   allowRoles("vendor", "admin"),
-  upload.array("images", 5),
+  upload.array("images", MAX_PRODUCT_IMAGES),
+
   async (req, res) => {
+
     const uploadedImages = [];
 
+    let productSaved = false;
+
     try {
+
       const {
         productName,
         description,
@@ -228,7 +633,8 @@ router.post(
         !req.files?.length
       ) {
         return res.status(400).json({
-          message: "Please provide all required product details and images"
+          message:
+            "Please provide all required product details and images"
         });
       }
 
@@ -247,62 +653,92 @@ router.post(
         )
       ) {
         return res.status(400).json({
-          message: "Please enter valid price and discount values"
+          message:
+            "Please enter valid price and discount values"
         });
       }
 
       // Prepare inventory
-      // Temporarily support the existing frontend
+      // Maintain compatibility with existing frontend
       let inventory = {
         variants: [],
         totalStock: Number(stock)
       };
 
-      // If variant data is provided, calculate stock from variants
+      // Calculate stock from variants
       if (rawVariants !== undefined) {
+
         try {
+
           inventory = prepareVariants(
             rawVariants,
             sizes,
             colors
           );
+
         } catch (error) {
+
           return res.status(400).json({
             message: error.message
           });
         }
+
       } else if (
         stock == null ||
         String(stock).trim() === "" ||
         !Number.isSafeInteger(Number(stock)) ||
         Number(stock) < 0
       ) {
+
         return res.status(400).json({
-          message: "Stock must be a non-negative whole number"
+          message:
+            "Stock must be a non-negative whole number"
         });
       }
 
-      // Upload images
-      for (const file of req.files) {
-        const result = await uploadToCloudinary(file);
+      // Validate colour-wise image metadata
+      let imageMetadata;
 
-        uploadedImages.push({
-          url: result.secure_url,
-          publicId: result.public_id
+      try {
+
+        imageMetadata = prepareImageMetadata(
+          req.files,
+          req.body.imageMetadata,
+          colors
+        );
+
+      } catch (error) {
+
+        return res.status(400).json({
+          message: error.message
         });
+      }
+
+      // Upload colour-wise product images
+      for (let i = 0; i < req.files.length; i++) {
+
+        const uploadedImage = await uploadImage(
+          req.files[i],
+          imageMetadata[i]
+        );
+
+        uploadedImages.push(uploadedImage);
       }
 
       // Create product
       const product = await Product.create({
+
         productName: productName.trim(),
         description: description.trim(),
         category,
         subCategory,
         brand: brand.trim(),
+
         price: Number(price),
 
         discountPrice:
-          discountPrice === "" || discountPrice === undefined
+          discountPrice === "" ||
+          discountPrice === undefined
             ? null
             : Number(discountPrice),
 
@@ -314,9 +750,14 @@ router.post(
 
         sizes,
         colors,
+
+        // Colour-wise product images
         images: uploadedImages,
+
         createdBy: req.currentUser._id
       });
+
+      productSaved = true;
 
       res.status(201).json({
         message: "Product added successfully",
@@ -324,11 +765,14 @@ router.post(
       });
 
     } catch (error) {
-      // Clean up uploaded images if product creation fails
-      for (const image of uploadedImages) {
-        await cloudinary.uploader
-          .destroy(image.publicId)
-          .catch(() => {});
+
+      // Clean up uploaded images only if creation fails
+      if (!productSaved) {
+
+        await cleanupImages(
+          uploadedImages,
+          "Image cleanup error:"
+        );
       }
 
       console.error("Add product error:", error);
@@ -340,59 +784,90 @@ router.post(
   }
 );
 
-// 4. Get a single product
+
+// ==================================================
+// 4. GET A SINGLE PRODUCT
+// ==================================================
+
 router.get("/:id", async (req, res) => {
+
   try {
-    const product = await Product.findById(req.params.id)
-      .populate("createdBy", "name");
+
+    const product = await Product.findById(
+      req.params.id
+    ).populate("createdBy", "name");
 
     if (!product) {
+
       return res.status(404).json({
         message: "Product not found"
       });
     }
 
-    res.status(200).json({ product });
+    res.status(200).json({
+      product
+    });
 
   } catch (error) {
+
     res.status(500).json({
       message: "Unable to fetch product"
     });
   }
 });
 
-// 5. Update product (Owner vendor or Admin)
+
+// ==================================================
+// 5. UPDATE PRODUCT (OWNER VENDOR OR ADMIN)
+// ==================================================
+
 router.put(
   "/:id",
   authMiddleware,
   loadCurrentUser,
   allowRoles("vendor", "admin"),
-  upload.array("images", 5),
+  upload.array("images", MAX_PRODUCT_IMAGES),
+
   async (req, res) => {
+
     const newlyUploadedImages = [];
 
+    let imagesToDelete = [];
+    let productSaved = false;
+
     try {
+
       const user = req.currentUser;
-      const product = await Product.findById(req.params.id);
+
+      const product = await Product.findById(
+        req.params.id
+      );
 
       if (!product) {
+
         return res.status(404).json({
           message: "Product not found"
         });
       }
 
-      // Save old image details before replacing them
-      const oldImages = [...product.images];
-
       // Vendor can update only their own products
       if (
         user.role === "vendor" &&
-        product.createdBy.toString() !== user._id.toString()
+        product.createdBy.toString() !==
+          user._id.toString()
       ) {
+
         return res.status(403).json({
-          message: "You can update only your own products"
+          message:
+            "You can update only your own products"
         });
       }
+
+      // Save original image details
+      const oldImages = [...product.images];
+
+      // Save original selected colours
+      const originalColors = [...product.colors];
 
       const {
         productName,
@@ -408,6 +883,7 @@ router.put(
         variants: rawVariants,
         expectedVersion
       } = req.body;
+
       // VALIDATE ORIGINAL PRODUCT VERSION
       if (
         expectedVersion === undefined ||
@@ -416,13 +892,16 @@ router.put(
         !Number.isSafeInteger(Number(expectedVersion)) ||
         Number(expectedVersion) < 0
       ) {
+
         return res.status(400).json({
-          message: "Product version is required. Please reload the product."
+          message:
+            "Product version is required. Please reload the product."
         });
       }
 
       // CHECK WHETHER PRODUCT HAS CHANGED
       if (Number(expectedVersion) !== product.__v) {
+
         return res.status(409).json({
           message:
             "Product details or inventory have changed. Please reload the latest product details before editing.",
@@ -431,15 +910,16 @@ router.put(
         });
       }
 
-      const oldSellingPrice = getSellingPrice(product);
+      const oldSellingPrice =
+        getSellingPrice(product);
 
-      // Calculate the updated price
+      // Calculate updated price
       const updatedPrice =
         price !== undefined
           ? Number(price)
           : product.price;
 
-      // Calculate the updated discount
+      // Calculate updated discount
       const updatedDiscount =
         discountPrice !== undefined
           ? discountPrice === ""
@@ -452,7 +932,7 @@ router.put(
         !Number.isFinite(updatedPrice) ||
         updatedPrice < 0 ||
         (
-          updatedDiscount !== null &&
+          updatedDiscount != null &&
           (
             !Number.isFinite(updatedDiscount) ||
             updatedDiscount < 0 ||
@@ -460,8 +940,10 @@ router.put(
           )
         )
       ) {
+
         return res.status(400).json({
-          message: "Please enter valid price and discount values"
+          message:
+            "Please enter valid price and discount values"
         });
       }
 
@@ -476,8 +958,10 @@ router.put(
           Number(stock) < 0
         )
       ) {
+
         return res.status(400).json({
-          message: "Stock must be a non-negative whole number"
+          message:
+            "Stock must be a non-negative whole number"
         });
       }
 
@@ -486,6 +970,7 @@ router.put(
         category !== undefined &&
         !["men", "women"].includes(category)
       ) {
+
         return res.status(400).json({
           message: "Category must be men or women"
         });
@@ -508,22 +993,28 @@ router.put(
         updatedSizes.length === 0 ||
         updatedColors.length === 0
       ) {
+
         return res.status(400).json({
-          message: "At least one size and colour are required"
+          message:
+            "At least one size and colour are required"
         });
       }
 
-      // Validate inventory before modifying the product
+      // Validate inventory before modifying product
       let inventory;
 
       if (rawVariants !== undefined) {
+
         try {
+
           inventory = prepareVariants(
             rawVariants,
             updatedSizes,
             updatedColors
           );
+
         } catch (error) {
+
           return res.status(400).json({
             message: error.message
           });
@@ -531,15 +1022,18 @@ router.put(
 
       } else if (product.variants?.length) {
 
-        // Prevent older clients from incorrectly updating
-        // variant-managed products
+        // Prevent older clients from incorrectly
+        // updating variant-managed products
         try {
+
           inventory = prepareVariants(
             product.variants,
             updatedSizes,
             updatedColors
           );
+
         } catch (error) {
+
           return res.status(400).json({
             message:
               "Provide updated variants when changing sizes or colours"
@@ -550,18 +1044,22 @@ router.put(
           stock !== undefined &&
           Number(stock) !== inventory.totalStock
         ) {
+
           return res.status(400).json({
-            message: "Update stock through product variants"
+            message:
+              "Update stock through product variants"
           });
         }
       }
 
-      // PREVENT STOCK LOSS DURING LEGACY INVENTORY MIGRATION
+      // PREVENT STOCK LOSS DURING LEGACY
+      // INVENTORY MIGRATION
       if (
         !product.variants?.length &&
         rawVariants !== undefined &&
         inventory.totalStock !== product.stock
       ) {
+
         return res.status(400).json({
           message:
             `Please distribute the existing ${product.stock} stock units among the selected variants before updating inventory.`
@@ -599,6 +1097,7 @@ router.put(
 
       // Update variant inventory and total stock
       if (inventory) {
+
         if (rawVariants !== undefined) {
           product.variants = inventory.variants;
         }
@@ -607,7 +1106,7 @@ router.put(
 
       } else if (stock !== undefined) {
 
-        // Maintain compatibility with existing products
+        // Maintain compatibility with legacy products
         product.stock = Number(stock);
       }
 
@@ -615,28 +1114,184 @@ router.put(
       product.sizes = updatedSizes;
       product.colors = updatedColors;
 
-      // Upload new images if provided
-      if (req.files?.length) {
-        for (const file of req.files) {
-          const result = await uploadToCloudinary(file);
 
-          newlyUploadedImages.push({
-            url: result.secure_url,
-            publicId: result.public_id
+      // ============================================
+      // NEW: INDIVIDUAL IMAGE MANAGEMENT
+      // ============================================
+
+      if (req.body.imageManifest !== undefined) {
+
+        let preparedImages;
+
+        try {
+
+          preparedImages = prepareImageUpdate(
+            req.files || [],
+            req.body.imageManifest,
+            updatedColors,
+            oldImages
+          );
+
+        } catch (error) {
+
+          return res.status(400).json({
+            message: error.message
           });
         }
 
+        const finalImages = [];
+
+        for (const item of preparedImages) {
+
+          // Retain existing image without reuploading
+          if (item.type === "existing") {
+
+            finalImages.push({
+
+              // Preserve MongoDB image ID
+              _id: item.image._id,
+
+              // Preserve existing storage information
+              url: item.image.url,
+              publicId: item.image.publicId,
+
+              provider:
+                item.image.provider || "cloudinary",
+
+              // Update colour, primary and order
+              ...item.metadata
+            });
+
+          } else {
+
+            // Upload only newly selected images
+            const uploadedImage = await uploadImage(
+              item.file,
+              item.metadata
+            );
+
+            newlyUploadedImages.push(uploadedImage);
+
+            finalImages.push(uploadedImage);
+          }
+        }
+
+        // Identify removed or replaced images
+        imagesToDelete = getRemovedImages(
+          oldImages,
+          finalImages
+        );
+
+        // Save complete final image collection
+        product.images = finalImages;
+
+
+      // ============================================
+      // BACKWARD COMPATIBILITY:
+      // COMPLETE IMAGE REPLACEMENT
+      // ============================================
+
+      } else if (req.files?.length) {
+
+        let imageMetadata;
+
+        try {
+
+          imageMetadata = prepareImageMetadata(
+            req.files,
+            req.body.imageMetadata,
+            updatedColors
+          );
+
+        } catch (error) {
+
+          return res.status(400).json({
+            message: error.message
+          });
+        }
+
+        for (let i = 0; i < req.files.length; i++) {
+
+          const uploadedImage = await uploadImage(
+            req.files[i],
+            imageMetadata[i]
+          );
+
+          newlyUploadedImages.push(uploadedImage);
+        }
+
+        // Replace complete image collection
         product.images = newlyUploadedImages;
+
+        // Identify old images to delete
+        imagesToDelete = getRemovedImages(
+          oldImages,
+          newlyUploadedImages
+        );
+
+
+      // ============================================
+      // NORMAL PRODUCT UPDATE WITHOUT IMAGE CHANGES
+      // ============================================
+
+      } else {
+
+        const previousColors = new Set(
+          originalColors
+        );
+
+        const colorsChanged =
+          updatedColors.length !== previousColors.size ||
+          updatedColors.some(
+            color => !previousColors.has(color)
+          );
+
+        // Require image information when changing colours
+        if (colorsChanged) {
+
+          return res.status(400).json({
+            message:
+              "Please provide images for all selected colours"
+          });
+        }
+
+        // Existing images remain unchanged.
+        // Legacy products without colour metadata
+        // can still update normal product details.
       }
 
-      // Save updated product
+
+      // ============================================
+      // SAVE UPDATED PRODUCT
+      // ============================================
+
       await product.save();
 
-      // Check if selling price has decreased
-      const newSellingPrice = getSellingPrice(product);
+      // Mark database update as successful
+      productSaved = true;
+
+
+      // ============================================
+      // DELETE ONLY REMOVED OR REPLACED IMAGES
+      // ============================================
+
+      await cleanupImages(
+        imagesToDelete,
+        "Removed image deletion error:"
+      );
+
+
+      // ============================================
+      // PRICE-DROP NOTIFICATIONS AND EMAILS
+      // ============================================
+
+      const newSellingPrice =
+        getSellingPrice(product);
 
       if (newSellingPrice < oldSellingPrice) {
+
         try {
+
           await createPriceDropNotifications({
             product,
             oldPrice: oldSellingPrice,
@@ -646,6 +1301,7 @@ router.put(
           await sendPriceDropEmails(product);
 
         } catch (notificationError) {
+
           console.error(
             "Price-drop notification/email error:",
             notificationError
@@ -653,72 +1309,77 @@ router.put(
         }
       }
 
-      // Delete old images only after successful save
-      if (newlyUploadedImages.length) {
-        for (const image of oldImages) {
-          if (image.publicId) {
-            await cloudinary.uploader
-              .destroy(image.publicId)
-              .catch(error => {
-                console.error(
-                  "Old image deletion error:",
-                  error
-                );
-              });
-          }
-        }
-      }
-
+      // Return updated product
       res.status(200).json({
         message: "Product updated successfully",
         product
       });
 
     } catch (error) {
-    console.error("Update product error:", error);
 
-    // Clean up newly uploaded images if update fails
-    for (const image of newlyUploadedImages) {
-      await cloudinary.uploader
-        .destroy(image.publicId)
-        .catch(() => {});
-    }
+      console.error(
+        "Update product error:",
+        error
+      );
 
-    // HANDLE CONCURRENT PRODUCT UPDATES
-    if (error.name === "VersionError") {
-      return res.status(409).json({
-        message:
-          "Product inventory was updated by another operation while you were saving. Please reload the product and try again.",
-        code: "PRODUCT_VERSION_CONFLICT"
+      // Clean up newly uploaded images only
+      // if MongoDB save did not succeed
+      if (!productSaved) {
+
+        await cleanupImages(
+          newlyUploadedImages,
+          "Image cleanup error:"
+        );
+      }
+
+      // HANDLE CONCURRENT PRODUCT UPDATES
+      if (error.name === "VersionError") {
+
+        return res.status(409).json({
+          message:
+            "Product inventory was updated by another operation while you were saving. Please reload the product and try again.",
+          code: "PRODUCT_VERSION_CONFLICT"
+        });
+      }
+
+      // HANDLE VALIDATION ERRORS
+      if (error.name === "ValidationError") {
+
+        return res.status(400).json({
+          message: error.message
+        });
+      }
+
+      return res.status(500).json({
+        message: "Unable to update product"
       });
     }
-
-    // HANDLE VALIDATION ERRORS
-    if (error.name === "ValidationError") {
-      return res.status(400).json({
-        message: error.message
-      });
-    }
-
-    return res.status(500).json({
-      message: "Unable to update product"
-    });
-  }
   }
 );
 
-// 6. Delete product (Owner vendor or Admin)
+
+// ==================================================
+// 6. DELETE PRODUCT (OWNER VENDOR OR ADMIN)
+// ==================================================
+
 router.delete(
   "/:id",
   authMiddleware,
   loadCurrentUser,
   allowRoles("vendor", "admin"),
+
   async (req, res) => {
+
     try {
+
       const user = req.currentUser;
-      const product = await Product.findById(req.params.id);
+
+      const product = await Product.findById(
+        req.params.id
+      );
 
       if (!product) {
+
         return res.status(404).json({
           message: "Product not found"
         });
@@ -727,29 +1388,38 @@ router.delete(
       // Vendor can delete only their own products
       if (
         user.role === "vendor" &&
-        product.createdBy.toString() !== user._id.toString()
+        product.createdBy.toString() !==
+          user._id.toString()
       ) {
+
         return res.status(403).json({
-          message: "You can delete only your own products"
+          message:
+            "You can delete only your own products"
         });
       }
 
-      // Delete product images from Cloudinary
-      for (const image of product.images) {
-        if (image.publicId) {
-          await cloudinary.uploader.destroy(image.publicId);
-        }
-      }
+      // Save image details before deleting product
+      const imagesToDelete = [...product.images];
 
-      // Delete product from MongoDB
+      // Delete product from MongoDB first
       await product.deleteOne();
+
+      // Delete associated images from storage
+      await cleanupImages(
+        imagesToDelete,
+        "Image deletion error:"
+      );
 
       res.status(200).json({
         message: "Product deleted successfully"
       });
 
     } catch (error) {
-      console.error("Delete product error:", error);
+
+      console.error(
+        "Delete product error:",
+        error
+      );
 
       res.status(500).json({
         message: "Unable to delete product"
